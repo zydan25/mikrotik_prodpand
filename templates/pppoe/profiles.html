@@ -32,16 +32,26 @@
   </div>
 </div>
 
-{% if selected and selected.last_sync_raw %}
-<div class="card mb-3" style="border:1px solid #cbd5e1;">
-  <details style="padding:12px 16px;">
-    <summary style="font-weight:800;cursor:pointer;">🧪 تشخيص آخر مزامنة ({{ 'الباقات' if selected.last_sync_raw.get('kind') == 'profiles' else 'المشتركين' }}) — {{ selected.last_sync_raw.get('raw_count', selected.last_sync_raw.get('total_secrets', 0)) }} سجل خام</summary>
-    <div style="margin-top:10px;color:#475569;font-size:.85rem;">
-      <div>المسار: <code>{{ selected.last_sync_raw.get('path', '/ppp/profile' if selected.last_sync_raw.get('kind') == 'profiles' else '/ppp/secret') }}</code></div>
-      <div>تمت المعالجة: {{ selected.last_sync_raw.get('processed_count', 0) }} | أضيفت: {{ selected.last_sync_raw.get('created', 0) }} | حُدّثت: {{ selected.last_sync_raw.get('updated', 0) }}{% if selected.last_sync_raw.get('kind') == 'profiles' %} | بلا اسم: {{ selected.last_sync_raw.get('skipped_without_name', 0) }}{% endif %}</div>
-      <div>الوقت: {{ selected.last_sync_raw.get('synced_at', 'غير متوفر') }}</div>
+{% if selected %}
+{% set sync_diag = (selected.last_sync_raw or {}).get('profile_sync') %}
+{% if not sync_diag and (selected.last_sync_raw or {}).get('kind') == 'profiles' %}
+  {% set sync_diag = selected.last_sync_raw %}
+{% endif %}
+<div class="card mb-3" style="border:1px solid #93c5fd;background:#f8fbff;">
+  <details open style="padding:12px 16px;">
+    <summary style="font-weight:800;cursor:pointer;color:#1d4ed8;">🧪 تشخيص آخر مزامنة للباقات — {{ sync_diag.get('raw_count', 0) if sync_diag else 0 }} سجل من الراوتر</summary>
+    {% if sync_diag %}
+    <div style="margin-top:10px;color:#334155;font-size:.85rem;display:grid;gap:5px;">
+      <div>المسار: <code dir="ltr">{{ sync_diag.get('path', '/ppp/profile') }}</code></div>
+      <div>النتيجة: <strong>{{ 'نجحت' if sync_diag.get('ok') else 'فشلت' }}</strong> | عولجت: {{ sync_diag.get('processed_count', 0) }} | أضيفت: {{ sync_diag.get('created', 0) }} | حُدّثت: {{ sync_diag.get('updated', 0) }} | بلا اسم: {{ sync_diag.get('skipped_without_name', 0) }}</div>
+      <div>وقت المزامنة: <code dir="ltr">{{ sync_diag.get('synced_at', 'غير متوفر') }}</code></div>
+      {% if sync_diag.get('error') %}<div style="color:#b91c1c;">الخطأ: {{ sync_diag.get('error') }}</div>{% endif %}
+      <div>المعروض أدناه عينة تصل إلى 50 سجلًا، وليست كامل الاستجابة عند تجاوز هذا العدد.</div>
     </div>
-    <pre dir="ltr" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;margin-top:10px;font-size:12px;">{{ selected.last_sync_raw.get('sample_json', 'لا توجد عينة خام') }}</pre>
+    <pre dir="ltr" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;margin-top:10px;font-size:12px;">{{ sync_diag.get('sample_json', 'لا توجد عينة من استجابة الراوتر') }}</pre>
+    {% else %}
+    <p style="margin:10px 0 0;color:#64748b;">لم تُسجّل مزامنة باقات بعد. اضغط «مزامنة الباقات من الراوتر» لعرض الاستجابة الخام ونتيجة المعالجة هنا.</p>
+    {% endif %}
   </details>
 </div>
 {% endif %}

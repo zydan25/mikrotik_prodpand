@@ -747,10 +747,14 @@ def api_sync_profiles(device_id):
     result = PPPoEService(device).get_profiles()
     now = datetime.utcnow()
     if not result.ok:
-        device.last_sync_raw = {'kind':'profiles','path':'/ppp/profile','ok':False,'synced_at':now.isoformat(),
-                                'error':result.message,'raw_count':0,'processed_count':0,'created':0,'updated':0,'sample_json':'[]'}
+        previous = dict(device.last_sync_raw or {})
+        diagnostic = {'kind':'profiles','path':'/ppp/profile','ok':False,'synced_at':now.isoformat(),
+                      'error':result.message,'raw_count':0,'processed_count':0,'created':0,'updated':0,'sample_json':'[]'}
+        previous['profile_sync'] = diagnostic
+        previous.update(diagnostic)
+        device.last_sync_raw = previous
         db.session.commit()
-        return jsonify(result.to_dict())
+        return jsonify({'ok':False,'message':result.message,'diagnostics':diagnostic})
 
     created, updated, skipped_without_name = 0, 0, 0
     raw_rows = result.data if isinstance(result.data, list) else []
@@ -793,13 +797,18 @@ def api_sync_profiles(device_id):
             safe_row.pop(key, None)
         safe_rows.append(safe_row)
     safe_sample = safe_rows[0] if safe_rows else {}
-    device.last_sync_raw = {
+    previous = dict(device.last_sync_raw or {})
+    diagnostic = {
         'kind':'profiles','path':'/ppp/profile','ok':True,'synced_at':now.isoformat(),
         'raw_count':len(raw_rows),'preview_count':len(safe_rows),
         'processed_count':created+updated,'created':created,'updated':updated,
         'skipped_without_name':skipped_without_name,
         'sample_json':json.dumps(safe_rows, ensure_ascii=False, indent=2, default=str)
     }
+    # Keep profile diagnostics independent from a later secret synchronization.
+    previous['profile_sync'] = diagnostic
+    previous.update(diagnostic)
+    device.last_sync_raw = previous
     db.session.commit()
     log_audit('sync_profiles', f'مزامنة باقات الراوتر: تم إضافة {created} وتحديث {updated}', 'device', device.id)
     return jsonify({'ok':True,'message':f'تمت المزامنة بنجاح: إضافة {created} وتحديث {updated} باقة',
@@ -860,6 +869,13 @@ def api_sync_subscriptions(device_id):
     svc = PPPoEService(device)
     result = svc.get_secrets()
     if not result.ok:
+        previous = dict(device.last_sync_raw or {})
+        diagnostic = {'kind':'subscriptions','path':'/ppp/secret','ok':False,'synced_at':datetime.utcnow().isoformat(),
+                      'error':result.message,'raw_count':0,'processed_count':0,'created':0,'updated':0,'sample_json':'[]'}
+        previous['subscription_sync'] = diagnostic
+        previous.update(diagnostic)
+        device.last_sync_raw = previous
+        db.session.commit()
         return jsonify(result.to_dict())
 
     # Map profiles by name
@@ -931,13 +947,17 @@ def api_sync_subscriptions(device_id):
             safe_row.pop(key, None)
         safe_rows.append(safe_row)
     safe_sample = safe_rows[0] if safe_rows else {}
-    device.last_sync_raw = {
+    previous = dict(device.last_sync_raw or {})
+    diagnostic = {
         'kind':'subscriptions','path':'/ppp/secret','ok':True,
         'total_secrets':len(result.data),'raw_count':len(result.data),'preview_count':len(safe_rows),
         'processed_count':created+updated,'created':created,'updated':updated,
         'synced_at':now.isoformat(),'sample':safe_sample,
         'sample_json':json.dumps(safe_rows, ensure_ascii=False, indent=2, default=str)
     }
+    previous['subscription_sync'] = diagnostic
+    previous.update(diagnostic)
+    device.last_sync_raw = previous
     db.session.commit()
     log_audit('sync_subs', f'مزامنة مشتركي الراوتر: استيراد {created} وتحديث {updated}', 'device', device.id)
     return jsonify({

@@ -143,8 +143,8 @@ def subscriptions():
         query = query.filter(PPPoESubscription.expires_at != None, PPPoESubscription.expires_at < now)
 
     if profile_filter:
-        query = query.filter_by(profile_id=profile_filter)
-    elif category_filter:
+        query = query.filter(PPPoESubscription.profile_id == profile_filter)
+    if category_filter:
         query = query.join(PPPoEProfile).filter(PPPoEProfile.category == category_filter)
 
     subs = query.order_by(PPPoESubscription.created_at.desc()).paginate(
@@ -301,9 +301,14 @@ def quick_renew():
             if not res.ok:
                 return jsonify({'ok': False, 'message': f'فشل التحديث في الراوتر: {res.message}'})
 
-        # تمديد التاريخ
-        base_date = sub.expires_at if sub.expires_at and sub.expires_at > now else now
-        sub.expires_at = base_date + timedelta(days=30 * months)
+        # تمديد التاريخ بالاعتماد على صلاحية الباقة الحقيقية
+        val_days = profile.validity_days if profile.validity_days else 30
+        if not sub.expires_at or sub.expires_at <= now:
+            sub.started_at = now
+            base_date = now
+        else:
+            base_date = sub.expires_at
+        sub.expires_at = base_date + timedelta(days=val_days * months)
         sub.profile_id = profile.id
         sub.price = price
         sub.price_currency = currency
@@ -366,7 +371,14 @@ def quick_renew():
             return jsonify({'ok': False, 'message': f'خطأ من الراوتر: {result.message}'})
 
         router_id = result.data.get('router_id', '') if isinstance(result.data, dict) else ''
-        expires_at = now + timedelta(days=30 * months)
+        val_days = profile.validity_days if profile.validity_days else 30
+        sub_started = now
+        if data.get('started_at'):
+            try:
+                sub_started = datetime.strptime(str(data.get('started_at')), '%Y-%m-%d')
+            except Exception:
+                pass
+        expires_at = sub_started + timedelta(days=val_days * months)
 
         sub = PPPoESubscription(
             device_id=device.id,
@@ -575,6 +587,13 @@ def edit_subscription(sub_id):
     sub.customer_address = str(data.get('customer_address', sub.customer_address or ''))
     sub.customer_notes = str(data.get('customer_notes', sub.customer_notes or ''))
     
+    started_raw = data.get('started_at', '')
+    if started_raw:
+        try:
+            sub.started_at = datetime.strptime(str(started_raw), '%Y-%m-%d')
+        except Exception:
+            pass
+
     expires_raw = data.get('expires_at', '')
     if expires_raw:
         try:
@@ -679,8 +698,12 @@ def profiles():
     selected = _get_device_or_first(selected_id)
     profiles_list = PPPoEProfile.query.filter_by(device_id=selected.id).all() if selected else []
     categories = sorted(list(set(p.category or 'عام' for p in profiles_list))) if profiles_list else ['عام']
+    standard_categories = ['برودباند عام', 'برودباند منزلي', 'سرعات فائقة / VIP', 'ألعاب (Gaming)', 'تجاري / شركات', 'خدمات شبكات و VPN', 'باقات النظام', 'باقات التوقف والحد']
+    db_categories = [p.category for p in profiles_list if p.category]
+    available_categories = sorted(list(set(standard_categories + db_categories)))
     return render_template('pppoe/profiles.html',
-        devices=devices, selected=selected, profiles=profiles_list, categories=categories)
+        devices=devices, selected=selected, profiles=profiles_list, categories=categories,
+        available_categories=available_categories)
 
 # ======================================================
 # تعديل فئة وسعر الباقة
@@ -861,6 +884,7 @@ def api_sync_subscriptions(device_id):
                 status='disabled' if disabled else 'active',
                 created_by_id=current_user.id,
                 started_at=now,
+                expires_at=now + timedelta(days=PPPoEProfile.query.get(profile_id).validity_days if profile_id and PPPoEProfile.query.get(profile_id) and PPPoEProfile.query.get(profile_id).validity_days else 30),
                 synced_at=now,
                 remote_exists=True
             )

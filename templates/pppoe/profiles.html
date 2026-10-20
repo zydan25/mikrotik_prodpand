@@ -65,8 +65,11 @@
             {{ p.name }}
           </td>
           <td>
-            <input type="text" id="cat-{{ p.id }}" class="form-input" value="{{ p.category or 'عام' }}"
-                   style="width:130px; padding:6px 10px; font-size:0.85rem; font-weight:600;" placeholder="فئة الباقة">
+            <select id="cat-{{ p.id }}" class="form-input" style="width:145px; padding:6px 8px; font-size:0.84rem; font-weight:700;">
+              {% for cat in available_categories %}
+              <option value="{{ cat }}" {% if (p.category or 'برودباند عام') == cat %}selected{% endif %}>{{ cat }}</option>
+              {% endfor %}
+            </select>
           </td>
           <td style="font-family:monospace; font-weight:700; color:#059669;">
             {{ p.rate_limit or 'غير محدد' }}
@@ -157,21 +160,25 @@
       </div>
 
       <div class="prof-mobile-inputs">
-        <div>
-          <label style="font-size:0.75rem; color:#64748b; font-weight:700;">الفئة:</label>
-          <input type="text" id="m-cat-{{ p.id }}" class="form-input" value="{{ p.category or 'عام' }}" style="padding:6px; font-size:0.85rem;">
+        <div class="prof-input-col">
+          <label style="font-size:0.75rem; color:#64748b; font-weight:700;">🏷️ الفئة:</label>
+          <select id="m-cat-{{ p.id }}" class="form-input" style="padding:6px; font-size:0.82rem; width:100%; box-sizing:border-box;">
+            {% for cat in available_categories %}
+            <option value="{{ cat }}" {% if (p.category or 'برودباند عام') == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+          </select>
         </div>
-        <div>
-          <label style="font-size:0.75rem; color:#64748b; font-weight:700;">السعر (د.ع):</label>
-          <input type="number" id="m-price-{{ p.id }}" class="form-input" value="{{ p.price|float }}" style="padding:6px; font-size:0.85rem;">
+        <div class="prof-input-col">
+          <label style="font-size:0.75rem; color:#64748b; font-weight:700;">💵 السعر (د.ع):</label>
+          <input type="number" id="m-price-{{ p.id }}" class="form-input" value="{{ p.price|float }}" style="padding:6px; font-size:0.85rem; width:100%; box-sizing:border-box;">
         </div>
-        <div>
-          <label style="font-size:0.75rem; color:#64748b; font-weight:700;">الحجم (GB):</label>
-          <input type="number" id="m-quota-{{ p.id }}" class="form-input" value="{{ p.quota_gb|float }}" style="padding:6px; font-size:0.85rem;" placeholder="0 للمفتوح">
+        <div class="prof-input-col">
+          <label style="font-size:0.75rem; color:#64748b; font-weight:700;">📊 الحجم (GB):</label>
+          <input type="number" id="m-quota-{{ p.id }}" class="form-input" value="{{ p.quota_gb|float if p.quota_gb|float > 0 else 0 }}" style="padding:6px; font-size:0.85rem; width:100%; box-sizing:border-box;" placeholder="0 = مفتوح">
         </div>
-        <div>
-          <label style="font-size:0.75rem; color:#64748b; font-weight:700;">الصلاحية (أيام):</label>
-          <input type="number" id="m-val-{{ p.id }}" class="form-input" value="{{ p.validity_days or 30 }}" style="padding:6px; font-size:0.85rem;">
+        <div class="prof-input-col">
+          <label style="font-size:0.75rem; color:#64748b; font-weight:700;">⏱️ الصلاحية (أيام):</label>
+          <input type="number" id="m-val-{{ p.id }}" class="form-input" value="{{ p.validity_days or 30 }}" style="padding:6px; font-size:0.85rem; width:100%; box-sizing:border-box;">
         </div>
       </div>
 

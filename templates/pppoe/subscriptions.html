@@ -4,14 +4,14 @@
 {% block breadcrumb %}الاشتراكات / {{ selected.name if selected else '' }}{% endblock %}
 
 {% block topbar_actions %}
-<div style="display:flex; gap:8px; flex-wrap:wrap;">
+<div class="topbar-actions-group">
   {% if selected %}
-  <button class="btn btn-outline btn-sm" onclick="syncSubscriptions({{ selected.id }}, this)" style="font-weight:700; color:#059669; border-color:#059669;" title="استيراد وتحديث كافة المشتركين المسجلين في الراوتر">
-    📥 استيراد المشتركين من الراوتر
+  <button type="button" class="btn btn-outline btn-sm topbar-action-btn" onclick="syncSubscriptions({{ selected.id }}, this)" style="font-weight:700; color:#059669; border-color:#059669;" title="استيراد وتحديث كافة المشتركين">
+    📥 <span class="desktop-text">استيراد المشتركين</span><span class="mobile-text">استيراد</span>
   </button>
   {% endif %}
-  <button class="btn btn-primary btn-sm" onclick="openQuickRenewModal()" style="font-weight:700;">
-    ⚡ تجديد / اشتراك جديد
+  <button type="button" class="btn btn-primary btn-sm topbar-action-btn" onclick="openQuickRenewModal()" style="font-weight:700;">
+    ⚡ <span class="desktop-text">تجديد / اشتراك جديد</span><span class="mobile-text">تجديد</span>
   </button>
 </div>
 {% endblock %}
@@ -97,10 +97,10 @@
       <thead>
         <tr>
           <th>المشترك (PPPoE)</th>
-          <th>الباقة والسرعة</th>
-          <th>المستهلك (تحميل / رفع)</th>
-          <th>السعة والمتبقي</th>
-          <th>البدء والانتهاء</th>
+          <th>الباقة والسرعة والفئة</th>
+          <th>استهلاك البيانات (تحميل ورفع)</th>
+          <th>السعة والرصيد المتبقي</th>
+          <th>فترة الاشتراك (البدء والانتهاء)</th>
           <th>الحالة</th>
           <th style="text-align:center;">إجراءات سريعة</th>
         </tr>
@@ -143,44 +143,60 @@
             </div>
           </td>
 
-          <!-- 3. Consumed Traffic (Live) -->
+          <!-- 3. Consumed Traffic -->
           <td>
             <div class="traffic-box">
-              <div class="traffic-tx">
-                <span>⬇️ تحميل:</span> <span>{{ s.tx_formatted }}</span>
+              <div style="display:flex; justify-content:space-between; gap:6px; font-size:0.82rem;">
+                <span style="color:#2563eb; font-weight:700;">📥 تحميل: {{ s.tx_formatted }}</span>
+                <span style="color:#059669; font-weight:700;">📤 رفع: {{ s.rx_formatted }}</span>
               </div>
-              <div class="traffic-rx">
-                <span>⬆️ رفع:</span> <span>{{ s.rx_formatted }}</span>
-              </div>
-              <div style="font-weight:700; color:#1e293b; margin-top:2px;">
-                المجموع: {{ s.consumed_formatted }}
+              <div style="font-size:0.82rem; color:#0f172a; font-weight:800; margin-top:4px;">
+                المستهلك: {{ s.consumed_formatted }}
               </div>
             </div>
           </td>
 
           <!-- 4. Quota & Remaining -->
           <td>
-            <div style="font-weight:700; color:#1e293b; font-size:0.85rem;">
-              السعة: {{ s.quota_display }}
-            </div>
-            <div style="font-size:0.8rem; color:#059669; font-weight:700; margin-top:2px;">
-              المتبقي: {{ s.remaining_quota_display }}
-            </div>
+            {% if s.quota_limit_gb|float > 0 or (s.profile and s.profile.quota_gb|float > 0) %}
+              <div style="font-weight:700; font-size:0.85rem; color:#0f172a;">
+                السعة: {{ s.quota_display }}
+              </div>
+              <div class="progress-track" style="margin:4px 0;">
+                <div class="progress-fill" style="width: {{ s.usage_percent }}%; background: {% if s.usage_percent > 85 %}#ef4444{% elif s.usage_percent > 60 %}#f59e0b{% else %}#10b981{% endif %};"></div>
+              </div>
+              <div style="font-size:0.8rem; color:{% if s.usage_percent > 85 %}#ef4444{% else %}#059669{% endif %}; font-weight:700;">
+                المتبقي: {{ s.remaining_quota_display }}
+              </div>
+            {% else %}
+              <div style="font-weight:700; font-size:0.85rem; color:#0f172a;">
+                السعة: <span class="badge" style="background:#e0f2fe; color:#0369a1;">غير محدود</span>
+              </div>
+              <div style="font-size:0.75rem; color:#64748b; margin-top:3px;">
+                الرصيد: مفتوح
+              </div>
+            {% endif %}
           </td>
 
           <!-- 5. Dates & Remaining Days -->
           <td>
-            <div style="font-size:0.78rem; color:#64748b;">
-              بدأ: {{ s.started_at.strftime('%Y-%m-%d') if s.started_at else '—' }}
+            <div style="font-size:0.8rem; color:#475569; margin-bottom:2px;">
+              <span>📅 بدأ:</span> <strong>{{ s.started_at.strftime('%Y-%m-%d') if s.started_at else '—' }}</strong>
             </div>
-            <div style="font-weight:700; color:#1e293b; font-size:0.88rem;">
-              ينتهي: {{ s.expires_at.strftime('%Y-%m-%d') if s.expires_at else 'مفتوح' }}
+            <div style="font-size:0.82rem; color:#0f172a; margin-bottom:4px;">
+              <span>⏳ ينتهي:</span> <strong>{{ s.expires_at.strftime('%Y-%m-%d') if s.expires_at else 'مفتوح' }}</strong>
             </div>
-            <small style="font-weight:700; color:{% if s.days_remaining is not none and s.days_remaining <= 3 %}#ef4444{% elif s.days_remaining is not none and s.days_remaining <= 7 %}#f59e0b{% else %}#10b981{% endif %};">
-              {% if s.days_remaining is not none %}
-                {% if s.days_remaining > 0 %}متبقي {{ s.days_remaining }} يوم{% elif s.days_remaining == 0 %}ينتهي اليوم{% else %}منتهي منذ {{ -s.days_remaining }} يوم{% endif %}
+            {% if s.days_remaining is not none %}
+              {% if s.days_remaining > 0 %}
+                <span class="badge" style="background:#dcfce7; color:#15803d; font-weight:700;">🟢 متبقي {{ s.days_remaining }} يوم</span>
+              {% elif s.days_remaining == 0 %}
+                <span class="badge" style="background:#fef3c7; color:#b45309; font-weight:700;">⚠️ ينتهي اليوم</span>
+              {% else %}
+                <span class="badge" style="background:#fee2e2; color:#b91c1c; font-weight:700;">🔴 منتهي منذ {{ -s.days_remaining }} يوم</span>
               {% endif %}
-            </small>
+            {% else %}
+              <span class="badge" style="background:#f1f5f9; color:#64748b;">غير محدد</span>
+            {% endif %}
           </td>
 
           <!-- 6. Status -->
@@ -259,43 +275,51 @@
       <!-- Stats Grid -->
       <div class="sub-mobile-stats-grid">
         <div class="sub-mobile-stat-item">
-          <span class="sub-mobile-stat-label">📦 الباقة والسرعة:</span>
-          <span class="sub-mobile-stat-val">{{ s.profile.name if s.profile else 'افتراضي' }} ({{ s.profile.rate_limit if s.profile and s.profile.rate_limit else 'مفتوح' }})</span>
+          <span class="sub-mobile-stat-label">📦 الباقة والفئة:</span>
+          <span class="sub-mobile-stat-val">{{ s.profile.name if s.profile else 'افتراضي' }} <small style="color:#64748b;">({{ s.profile.category if s.profile else 'عام' }})</small></span>
         </div>
         <div class="sub-mobile-stat-item">
-          <span class="sub-mobile-stat-label">📊 المستهلك الإجمالي:</span>
-          <span class="sub-mobile-stat-val" style="color:#2563eb;">{{ s.consumed_formatted }}</span>
+          <span class="sub-mobile-stat-label">⚡ السرعة:</span>
+          <span class="sub-mobile-stat-val" style="color:#059669;">{{ s.profile.rate_limit if s.profile and s.profile.rate_limit else 'مفتوح' }}</span>
         </div>
         <div class="sub-mobile-stat-item">
-          <span class="sub-mobile-stat-label">⬇️ التحميل / ⬆️ الرفع:</span>
+          <span class="sub-mobile-stat-label">📥 التحميل / 📤 الرفع:</span>
           <span class="sub-mobile-stat-val" style="font-size:0.8rem;">{{ s.tx_formatted }} / {{ s.rx_formatted }}</span>
         </div>
         <div class="sub-mobile-stat-item">
-          <span class="sub-mobile-stat-label">📦 سعة الباقة:</span>
+          <span class="sub-mobile-stat-label">📊 إجمالي المستهلك:</span>
+          <span class="sub-mobile-stat-val" style="color:#2563eb; font-weight:800;">{{ s.consumed_formatted }}</span>
+        </div>
+        <div class="sub-mobile-stat-item">
+          <span class="sub-mobile-stat-label">💽 سعة الباقة:</span>
           <span class="sub-mobile-stat-val">{{ s.quota_display }}</span>
+        </div>
+        <div class="sub-mobile-stat-item">
+          <span class="sub-mobile-stat-label">✨ الرصيد المتبقي:</span>
+          <span class="sub-mobile-stat-val" style="color:{% if s.usage_percent > 85 %}#ef4444{% else %}#059669{% endif %}; font-weight:800;">
+            {{ s.remaining_quota_display }}
+          </span>
         </div>
         <div class="sub-mobile-stat-item">
           <span class="sub-mobile-stat-label">📅 تاريخ البدء:</span>
           <span class="sub-mobile-stat-val">{{ s.started_at.strftime('%Y-%m-%d') if s.started_at else '—' }}</span>
         </div>
         <div class="sub-mobile-stat-item">
-          <span class="sub-mobile-stat-label">📅 تاريخ الانتهاء:</span>
-          <span class="sub-mobile-stat-val" style="{% if s.days_remaining is not none and s.days_remaining <= 3 %}color:#ef4444;{% endif %}">
-            {{ s.expires_at.strftime('%Y-%m-%d') if s.expires_at else 'مفتوح' }}
-          </span>
+          <span class="sub-mobile-stat-label">⏳ تاريخ الانتهاء:</span>
+          <span class="sub-mobile-stat-val" style="font-weight:700;">{{ s.expires_at.strftime('%Y-%m-%d') if s.expires_at else 'مفتوح' }}</span>
         </div>
         <div class="sub-mobile-stat-item">
-          <span class="sub-mobile-stat-label">⏱️ المتبقي:</span>
-          <span class="sub-mobile-stat-val" style="font-weight:700;">
+          <span class="sub-mobile-stat-label">⏱️ الأيام المتبقية:</span>
+          <span class="sub-mobile-stat-val" style="font-weight:800;">
             {% if s.days_remaining is not none %}
               {% if s.days_remaining > 0 %}
-                <span style="color:#10b981;">{{ s.days_remaining }} يوم</span>
+                <span style="color:#10b981;">🟢 متبقي {{ s.days_remaining }} يوم</span>
               {% elif s.days_remaining == 0 %}
-                <span style="color:#f59e0b;">ينتهي اليوم</span>
+                <span style="color:#f59e0b;">⚠️ ينتهي اليوم</span>
               {% else %}
-                <span style="color:#ef4444;">منتهي</span>
+                <span style="color:#ef4444;">🔴 منتهي ({{ -s.days_remaining }} يوم)</span>
               {% endif %}
-            {% else %}—{% endif %}
+            {% else %}مفتوح{% endif %}
           </span>
         </div>
         <div class="sub-mobile-stat-item">
@@ -303,7 +327,6 @@
           <span class="sub-mobile-stat-val">{{ "{:,.0f}".format(s.price or (s.profile.price if s.profile else 0)) }} د.ع</span>
         </div>
       </div>
-
       <!-- Customer details if present -->
       {% if s.customer_name or s.customer_phone or s.comment %}
       <div class="sub-mobile-customer-info">

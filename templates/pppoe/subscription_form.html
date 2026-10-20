@@ -70,7 +70,7 @@
         </div>
       </div>
 
-      <div class="form-row form-row-3">
+      <div class="form-row form-row-2">
         <div class="form-group mb-3">
           <label class="form-label">IP ثابت (اختياري)</label>
           <input type="text" name="static_ip" class="form-input" placeholder="192.168.1.100"
@@ -81,10 +81,35 @@
           <input type="text" name="caller_id" class="form-input" placeholder="AA:BB:CC:DD:EE:FF"
                  value="{{ sub.caller_id if sub else '' }}" style="font-family:monospace;">
         </div>
+      </div>
+
+      <!-- قسم الصلاحية والتواريخ الحقيقية -->
+      <h4 style="color:#2563eb; font-size:0.95rem; font-weight:800; margin:24px 0 16px; padding-bottom:8px; border-bottom:2px solid #dbeafe;">
+        📅 فترة الصلاحية وتاريخ البدء والانتهاء الحقيقي
+      </h4>
+
+      <div class="form-row form-row-3">
         <div class="form-group mb-3">
-          <label class="form-label">تاريخ الانتهاء</label>
-          <input type="date" name="expires_at" class="form-input"
-                 value="{{ sub.expires_at.strftime('%Y-%m-%d') if sub and sub.expires_at else '' }}">
+          <label class="form-label" style="font-weight:700;">تاريخ بدء الاشتراك الحقيقي *</label>
+          <input type="date" name="started_at" id="started_at_input" class="form-input"
+                 value="{{ sub.started_at.strftime('%Y-%m-%d') if sub and sub.started_at else '' }}"
+                 onchange="autoCalcExpiry()" required>
+        </div>
+
+        <div class="form-group mb-3">
+          <label class="form-label" style="font-weight:700;">مدة الصلاحية (بالأيام)</label>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <input type="number" id="validity_days_input" class="form-input"
+                   value="{{ sub.profile.validity_days if sub and sub.profile and sub.profile.validity_days else 30 }}"
+                   min="1" max="365" onchange="autoCalcExpiry()">
+            <span style="font-size:0.8rem; color:#64748b; white-space:nowrap;">يوم</span>
+          </div>
+        </div>
+
+        <div class="form-group mb-3">
+          <label class="form-label" style="font-weight:700;">تاريخ الانتهاء المحسوب *</label>
+          <input type="date" name="expires_at" id="expires_at_input" class="form-input"
+                 value="{{ sub.expires_at.strftime('%Y-%m-%d') if sub and sub.expires_at else '' }}" required>
         </div>
       </div>
 
@@ -144,6 +169,34 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script>
+function autoCalcExpiry() {
+  const startInput = document.getElementById('started_at_input');
+  const valInput = document.getElementById('validity_days_input');
+  const expInput = document.getElementById('expires_at_input');
+  if (!startInput || !expInput) return;
+  const startVal = startInput.value;
+  const days = parseInt(valInput ? valInput.value : 30) || 30;
+  if (startVal) {
+    const d = new Date(startVal);
+    d.setDate(d.getDate() + days);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    expInput.value = `${yyyy}-${mm}-${dd}`;
+  }
+}
+// Profile change auto-updates validity
+document.getElementById('profile-select')?.addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex];
+  if (opt && opt.dataset.price) {
+    const priceInput = document.getElementById('price-input');
+    if (priceInput) priceInput.value = opt.dataset.price;
+  }
+  autoCalcExpiry();
+});
+</script>
+
 <script>
 // تحديث السعر تلقائياً عند اختيار باقة
 const profSel = document.getElementById('profile-select');

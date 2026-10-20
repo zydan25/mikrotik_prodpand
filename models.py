@@ -234,6 +234,15 @@ class PPPoESubscription(db.Model):
         return f'{round(rem if rem > 0 else 0, 2)} GB'
 
     @property
+    def usage_percent(self):
+        limit = float(self.quota_limit_gb or (self.profile.quota_gb if self.profile else 0) or 0)
+        if limit <= 0:
+            return 0
+        consumed_gb = self.total_bytes / (1024**3)
+        pct = (consumed_gb / limit) * 100
+        return min(round(pct, 1), 100)
+
+    @property
     def days_remaining(self):
         if not self.expires_at:
             return None

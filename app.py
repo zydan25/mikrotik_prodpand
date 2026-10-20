@@ -9,6 +9,54 @@ from models import db, User
 from config import config
 from datetime import datetime
 
+def _ensure_schema():
+    from models import db
+    try:
+        with db.engine.connect() as conn:
+            # 1. pppoe_subscriptions
+            res = conn.execute(db.text("PRAGMA table_info(pppoe_subscriptions)")).fetchall()
+            cols = [r[1] for r in res]
+            if cols:
+                needed = [
+                    ('raw_payload', 'JSON'),
+                    ('last_logged_out', "VARCHAR(64) DEFAULT ''"),
+                    ('total_bytes_in', 'BIGINT DEFAULT 0'),
+                    ('total_bytes_out', 'BIGINT DEFAULT 0'),
+                    ('quota_limit_gb', 'NUMERIC(10, 2) DEFAULT 0'),
+                    ('uptime', "VARCHAR(64) DEFAULT ''"),
+                    ('is_online', 'BOOLEAN DEFAULT 0'),
+                    ('current_ip', "VARCHAR(64) DEFAULT ''")
+                ]
+                for col_name, col_type in needed:
+                    if col_name not in cols:
+                        conn.execute(db.text(f"ALTER TABLE pppoe_subscriptions ADD COLUMN {col_name} {col_type}"))
+                        conn.commit()
+
+            # 2. mikrotik_devices
+            res_dev = conn.execute(db.text("PRAGMA table_info(mikrotik_devices)")).fetchall()
+            dev_cols = [r[1] for r in res_dev]
+            if dev_cols and 'last_sync_raw' not in dev_cols:
+                conn.execute(db.text("ALTER TABLE mikrotik_devices ADD COLUMN last_sync_raw JSON"))
+                conn.commit()
+
+            # 3. pppoe_profiles
+            res_prof = conn.execute(db.text("PRAGMA table_info(pppoe_profiles)")).fetchall()
+            prof_cols = [r[1] for r in res_prof]
+            if prof_cols:
+                prof_needed = [
+                    ('category', "VARCHAR(100) DEFAULT 'عام'"),
+                    ('quota_gb', "NUMERIC(10, 2) DEFAULT 0"),
+                    ('validity_days', "INTEGER DEFAULT 30"),
+                    ('raw_payload', "JSON")
+                ]
+                for col_name, col_type in prof_needed:
+                    if col_name not in prof_cols:
+                        conn.execute(db.text(f"ALTER TABLE pppoe_profiles ADD COLUMN {col_name} {col_type}"))
+                        conn.commit()
+    except Exception as e:
+        sys.stderr.write(f"[WARN] _ensure_schema: {e}\n")
+        sys.stderr.flush()
+
 def create_app(config_name='default'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
@@ -74,6 +122,7 @@ def create_app(config_name='default'):
 
     with app.app_context():
         db.create_all()
+        _ensure_schema()
         _ensure_admin()
 
     return app
@@ -97,3 +146,4 @@ app = create_app()
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
+

@@ -32,6 +32,20 @@
   </div>
 </div>
 
+{% if selected and selected.last_sync_raw %}
+<div class="card mb-3" style="border:1px solid #cbd5e1;">
+  <details style="padding:12px 16px;">
+    <summary style="font-weight:800;cursor:pointer;">🧪 تشخيص آخر مزامنة ({{ 'الباقات' if selected.last_sync_raw.get('kind') == 'profiles' else 'المشتركين' }}) — {{ selected.last_sync_raw.get('raw_count', selected.last_sync_raw.get('total_secrets', 0)) }} سجل خام</summary>
+    <div style="margin-top:10px;color:#475569;font-size:.85rem;">
+      <div>المسار: <code>{{ selected.last_sync_raw.get('path', '/ppp/profile' if selected.last_sync_raw.get('kind') == 'profiles' else '/ppp/secret') }}</code></div>
+      <div>تمت المعالجة: {{ selected.last_sync_raw.get('processed_count', 0) }} | أضيفت: {{ selected.last_sync_raw.get('created', 0) }} | حُدّثت: {{ selected.last_sync_raw.get('updated', 0) }}{% if selected.last_sync_raw.get('kind') == 'profiles' %} | بلا اسم: {{ selected.last_sync_raw.get('skipped_without_name', 0) }}{% endif %}</div>
+      <div>الوقت: {{ selected.last_sync_raw.get('synced_at', 'غير متوفر') }}</div>
+    </div>
+    <pre dir="ltr" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;margin-top:10px;font-size:12px;">{{ selected.last_sync_raw.get('sample_json', 'لا توجد عينة خام') }}</pre>
+  </details>
+</div>
+{% endif %}
+
 <div class="card">
   <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
     <div>
@@ -78,7 +92,7 @@
             <div style="display:flex; align-items:center; gap:4px;">
               <input type="number" id="quota-{{ p.id }}" class="form-input" value="{{ p.quota_gb|float }}"
                      style="width:75px; padding:6px 8px; font-size:0.85rem; font-weight:700;" placeholder="0" min="0" step="any">
-              <span style="font-size:0.75rem; color:#64748b;">{% if p.quota_gb|float > 0 %}GB{% else %}مفتوح{% endif %}</span>
+              <span style="font-size:0.75rem; color:#64748b;">{% if p.quota_gb|float > 0 %}GB{% elif (p.raw_payload or {}).get('_local_quota_configured') %}مفتوح{% else %}غير محدد{% endif %}</span>
             </div>
           </td>
           <td>
@@ -139,7 +153,7 @@
         </div>
         <div class="prof-mobile-item">
           <span class="prof-mobile-label">📊 حجم البيانات:</span>
-          <span class="prof-mobile-val">{% if p.quota_gb|float > 0 %}{{ p.quota_gb|float }} GB{% else %}مفتوح (Unlimited){% endif %}</span>
+          <span class="prof-mobile-val">{% if p.quota_gb|float > 0 %}{{ p.quota_gb|float }} GB{% elif (p.raw_payload or {}).get('_local_quota_configured') %}مفتوح (Unlimited){% else %}غير محدد من الراوتر{% endif %}</span>
         </div>
         <div class="prof-mobile-item">
           <span class="prof-mobile-label">⏱️ الصلاحية:</span>

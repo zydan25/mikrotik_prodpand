@@ -6,6 +6,7 @@ from models import db, MikroTikDevice, PPPoEProfile, PPPoESubscription, Payment,
 from blueprints.mikrotik.service import PPPoEService
 from datetime import datetime, timedelta
 from functools import wraps
+import json
 
 pppoe_bp = Blueprint('pppoe', __name__, url_prefix='')
 
@@ -724,6 +725,10 @@ def edit_profile_pricing(profile_id):
         p.price_currency = str(data.get('currency', 'IQD'))
     if 'quota_gb' in data:
         p.quota_gb = float(data.get('quota_gb', 0) or 0)
+        # Quota is local policy; RouterOS PPP profiles do not expose a GB quota.
+        raw_payload = dict(p.raw_payload or {})
+        raw_payload['_local_quota_configured'] = True
+        p.raw_payload = raw_payload
     if 'validity_days' in data:
         p.validity_days = int(data.get('validity_days', 30) or 30)
     db.session.commit()
@@ -739,47 +744,68 @@ def api_sync_profiles(device_id):
     if not (current_user.is_admin or current_user.is_supervisor):
         return jsonify({'ok': False, 'message': 'لا تملك صلاحية المزامنة'}), 403
     device = MikroTikDevice.query.get_or_404(device_id)
-    svc = PPPoEService(device)
-    result = svc.get_profiles()
+    result = PPPoEService(device).get_profiles()
+    now = datetime.utcnow()
     if not result.ok:
+        device.last_sync_raw = {'kind':'profiles','path':'/ppp/profile','ok':False,'synced_at':now.isoformat(),
+                                'error':result.message,'raw_count':0,'processed_count':0,'created':0,'updated':0,'sample_json':'[]'}
+        db.session.commit()
         return jsonify(result.to_dict())
 
-    created, updated = 0, 0
-    for row in result.data:
-        rid = str(row.get('.id', ''))
+    created, updated, skipped_without_name = 0, 0, 0
+    raw_rows = result.data if isinstance(result.data, list) else []
+    for row in raw_rows:
+        rid = str(row.get('.id', row.get('id', '')))
         name = str(row.get('name', '')).strip()
-        if not name: continue
+        if not name:
+            skipped_without_name += 1
+            continue
         existing = PPPoEProfile.query.filter_by(device_id=device_id, name=name).first()
         if existing:
-            existing.router_id = rid
+            existing.router_id = rid or existing.router_id
             existing.rate_limit = row.get('rate-limit', existing.rate_limit)
             existing.local_address = row.get('local-address', existing.local_address)
             existing.remote_address = row.get('remote-address', existing.remote_address)
             existing.dns_server = row.get('dns-server', existing.dns_server)
             existing.session_timeout = row.get('session-timeout', existing.session_timeout)
-            existing.synced_at = datetime.utcnow()
-            existing.raw_payload = row
+            existing.idle_timeout = row.get('idle-timeout', existing.idle_timeout)
+            existing.synced_at = now
+            old_raw = dict(existing.raw_payload or {})
+            existing.raw_payload = dict(row, _local_quota_configured=old_raw.get('_local_quota_configured', False))
             updated += 1
         else:
-            p = PPPoEProfile(
-                device_id=device_id,
-                name=name,
+            db.session.add(PPPoEProfile(
+                device_id=device_id, name=name,
                 category=auto_detect_category(name, row.get('rate-limit', '')),
-                router_id=rid,
-                rate_limit=row.get('rate-limit', ''),
-                local_address=row.get('local-address', ''),
-                remote_address=row.get('remote-address', ''),
-                dns_server=row.get('dns-server', ''),
-                session_timeout=row.get('session-timeout', ''),
-                synced_at=datetime.utcnow(),
-                raw_payload=row
-            )
-            db.session.add(p)
+                router_id=rid, rate_limit=row.get('rate-limit', ''),
+                local_address=row.get('local-address', ''), remote_address=row.get('remote-address', ''),
+                dns_server=row.get('dns-server', ''), session_timeout=row.get('session-timeout', ''),
+                idle_timeout=row.get('idle-timeout', ''), synced_at=now,
+                # The RouterOS PPP profile response has no GB quota field.
+                raw_payload=dict(row, _local_quota_configured=False)
+            ))
             created += 1
 
+    safe_rows = []
+    for raw_row in raw_rows[:50]:
+        safe_row = dict(raw_row)
+        for key in ('password', 'secret', 'token', 'api-key'):
+            safe_row.pop(key, None)
+        safe_rows.append(safe_row)
+    safe_sample = safe_rows[0] if safe_rows else {}
+    device.last_sync_raw = {
+        'kind':'profiles','path':'/ppp/profile','ok':True,'synced_at':now.isoformat(),
+        'raw_count':len(raw_rows),'preview_count':len(safe_rows),
+        'processed_count':created+updated,'created':created,'updated':updated,
+        'skipped_without_name':skipped_without_name,
+        'sample_json':json.dumps(safe_rows, ensure_ascii=False, indent=2, default=str)
+    }
     db.session.commit()
     log_audit('sync_profiles', f'مزامنة باقات الراوتر: تم إضافة {created} وتحديث {updated}', 'device', device.id)
-    return jsonify({'ok': True, 'message': f'تمت المزامنة بنجاح: إضافة {created} وتحديث {updated} باقة'})
+    return jsonify({'ok':True,'message':f'تمت المزامنة بنجاح: إضافة {created} وتحديث {updated} باقة',
+                    'diagnostics':{'path':'/ppp/profile','raw_count':len(raw_rows),
+                                   'processed_count':created+updated,'created':created,'updated':updated,
+                                   'skipped_without_name':skipped_without_name,'sample':safe_sample}})
 
 
 def decode_mikrotik_text(text):
@@ -897,10 +923,20 @@ def api_sync_subscriptions(device_id):
             db.session.add(sub)
             created += 1
 
+    # Keep a useful raw preview while excluding credentials from the API response and database diagnostics.
+    safe_rows = []
+    for raw_row in result.data[:50]:
+        safe_row = dict(raw_row)
+        for key in ('password', 'secret', 'token', 'api-key'):
+            safe_row.pop(key, None)
+        safe_rows.append(safe_row)
+    safe_sample = safe_rows[0] if safe_rows else {}
     device.last_sync_raw = {
-        'total_secrets': len(result.data),
-        'synced_at': now.isoformat(),
-        'sample': result.data[0] if result.data else {}
+        'kind':'subscriptions','path':'/ppp/secret','ok':True,
+        'total_secrets':len(result.data),'raw_count':len(result.data),'preview_count':len(safe_rows),
+        'processed_count':created+updated,'created':created,'updated':updated,
+        'synced_at':now.isoformat(),'sample':safe_sample,
+        'sample_json':json.dumps(safe_rows, ensure_ascii=False, indent=2, default=str)
     }
     db.session.commit()
     log_audit('sync_subs', f'مزامنة مشتركي الراوتر: استيراد {created} وتحديث {updated}', 'device', device.id)

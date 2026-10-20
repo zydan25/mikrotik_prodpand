@@ -19,10 +19,11 @@
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-brand">
     <div class="brand-icon">P</div>
-    <div>
+    <div class="brand-info">
       <div class="brand-text">PPPoE Manager</div>
       <div class="brand-sub">بوابة الاشتراكات السريعة</div>
     </div>
+    <button type="button" class="sidebar-close-btn" id="sidebar-close-btn" aria-label="إغلاق القائمة">✕</button>
   </div>
 
   <nav class="sidebar-nav">
@@ -113,16 +114,19 @@
 <div class="main-content">
   <!-- TOPBAR -->
   <header class="topbar">
-    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="القائمة الجانبية">☰</button>
-    <div>
-      <div class="topbar-title">{% block page_title %}الصفحة الرئيسية{% endblock %}</div>
-      <div class="topbar-breadcrumb">{% block breadcrumb %}{% endblock %}</div>
+    <div class="topbar-left-side">
+      <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-label="القائمة الجانبية">☰</button>
+      <div class="topbar-title-box">
+        <h1 class="topbar-title">{% block page_title %}الصفحة الرئيسية{% endblock %}</h1>
+        <div class="topbar-breadcrumb">{% block breadcrumb %}{% endblock %}</div>
+      </div>
     </div>
     <div class="topbar-actions">
+      {% block topbar_actions %}
       <button type="button" class="btn btn-primary btn-sm" onclick="openQuickRenewModal()" style="display:inline-flex; align-items:center; gap:6px; font-weight:700;">
         <span>⚡</span> تجديد سريع
       </button>
-      {% block topbar_actions %}{% endblock %}
+      {% endblock %}
     </div>
   </header>
 

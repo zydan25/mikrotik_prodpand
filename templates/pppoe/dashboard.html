@@ -3,50 +3,50 @@
 {% block page_title %}لوحة التحكم — PPPoE Manager{% endblock %}
 
 {% block topbar_actions %}
-  <div style="display:flex; align-items:center; gap:8px;">
+  <div class="dashboard-topbar-actions">
     {% if devices %}
-    <select class="form-input searchable-select device-select" style="min-width:180px; padding:6px 12px; font-size:0.85rem;" data-placeholder="اختر جهاز الراوتر">
+    <select class="form-input searchable-select device-select dashboard-device-select" data-placeholder="اختر جهاز الراوتر">
       {% for d in devices %}
       <option value="{{ d.id }}" {% if selected and selected.id == d.id %}selected{% endif %}>
-        {{ d.name }} ({{ d.host }})
+        {{ d.name }}
       </option>
       {% endfor %}
     </select>
     {% endif %}
-    <button class="btn btn-primary btn-sm" onclick="openQuickRenewModal()" style="font-weight:700;">
-      ⚡ تجديد سريع
+    <button type="button" class="btn btn-primary btn-sm" onclick="openQuickRenewModal()" style="font-weight:700; white-space:nowrap;">
+      ⚡ تجديد
     </button>
   </div>
 {% endblock %}
 
 {% block content %}
 <!-- Welcome & Quick Action Card -->
-<div class="card mb-4" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #fff; border:none; padding: 22px 26px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.3);">
-  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
-    <div>
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+<div class="card dashboard-banner mb-3">
+  <div class="dashboard-banner-content">
+    <div class="dashboard-banner-info">
+      <div class="dashboard-banner-status">
         <span class="status-dot {% if selected and selected.last_status == 'online' %}online{% else %}offline{% endif %}"></span>
-        <h2 style="font-size:1.35rem; margin:0; font-weight:800; color:#fff;">
+        <h2>
           {% if selected %}جهاز: {{ selected.name }} ({{ selected.host }}){% else %}لا يوجد أجهزة مضافة{% endif %}
         </h2>
       </div>
-      <p style="margin:0; font-size:0.88rem; color:#94a3b8;">
+      <p>
         إدارة اشتراكات البرودباند PPPoE، التجديد الفوري، فصل الجلسات، وسندات تحصيل الموظفين
       </p>
     </div>
-    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-      <button class="btn btn-primary" onclick="openQuickRenewModal()" style="font-weight:700; padding:10px 18px; box-shadow:0 4px 12px rgba(37,99,235,0.4);">
-        ⚡ تجديد أو اشتراك جديد
+    <div class="dashboard-banner-actions">
+      <button type="button" class="btn btn-primary" onclick="openQuickRenewModal()" style="font-weight:700;">
+        ⚡ تجديد / اشتراك
       </button>
       {% if selected %}
-      <a href="http://{{ selected.host }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="color:#fff; border-color:#475569;" title="فتح صفحة ويب الراوتر (WebFig) في نافذة جديدة">
-        🌐 صفحة ويب الراوتر
+      <a href="http://{{ selected.host }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="color:#fff; border-color:#475569;" title="فتح صفحة ويب الراوتر (WebFig)">
+        🌐 WebFig
       </a>
-      <button class="btn btn-outline" style="color:#fff; border-color:#475569;" onclick="syncSubscriptions({{ selected.id }}, this)" title="استيراد المشتركين من الراوتر">
-        📥 استيراد المشتركين
+      <button type="button" class="btn btn-outline" style="color:#fff; border-color:#475569;" onclick="syncSubscriptions({{ selected.id }}, this)" title="استيراد المشتركين">
+        📥 استيراد
       </button>
-      <button class="btn btn-outline" style="color:#fff; border-color:#475569;" onclick="syncProfiles({{ selected.id }}, this)">
-        🔄 مزامنة الباقات
+      <button type="button" class="btn btn-outline" style="color:#fff; border-color:#475569;" onclick="syncProfiles({{ selected.id }}, this)">
+        🔄 الباقات
       </button>
       {% endif %}
     </div>
@@ -54,38 +54,38 @@
 </div>
 
 <!-- ==================== KPI STATS GRID ==================== -->
-<div class="grid grid-4 mb-4" style="gap:14px;">
+<div class="grid dashboard-kpi-grid mb-3">
   <!-- Card 1 -->
-  <div class="stat-card" style="border-top:4px solid #3b82f6;">
+  <div class="stat-card" style="border-top:3px solid #3b82f6;">
     <div class="stat-icon" style="background:rgba(59,130,246,0.1); color:#3b82f6;">👥</div>
-    <div>
+    <div class="stat-details">
       <div class="stat-value" id="stat-total">{{ stats.total }}</div>
       <div class="stat-label">إجمالي المشتركين</div>
     </div>
   </div>
 
   <!-- Card 2 -->
-  <div class="stat-card" style="border-top:4px solid #10b981;">
+  <div class="stat-card" style="border-top:3px solid #10b981;">
     <div class="stat-icon" style="background:rgba(16,185,129,0.1); color:#10b981;">🟢</div>
-    <div>
+    <div class="stat-details">
       <div class="stat-value" id="stat-active">{{ stats.active }}</div>
       <div class="stat-label">اشتراكات سارية</div>
     </div>
   </div>
 
   <!-- Card 3 -->
-  <div class="stat-card" style="border-top:4px solid #f59e0b;">
-    <div class="stat-icon" style="background:rgba(245,158,11,0.1); color:#f59e0b;">⏱️</div>
-    <div>
+  <div class="stat-card" style="border-top:3px solid #f59e0b;">
+    <div class="stat-icon" style="background:rgba(245,158,11,0.1); color:#f59e0b;">⏳</div>
+    <div class="stat-details">
       <div class="stat-value" id="stat-expiring">{{ stats.expiring_soon }}</div>
-      <div class="stat-label">تنتهي قريباً (خلال 5 أيام)</div>
+      <div class="stat-label">تنتهي قريباً (5 أيام)</div>
     </div>
   </div>
 
   <!-- Card 4 -->
-  <div class="stat-card" style="border-top:4px solid #ef4444;">
+  <div class="stat-card" style="border-top:3px solid #ef4444;">
     <div class="stat-icon" style="background:rgba(239,68,68,0.1); color:#ef4444;">🔴</div>
-    <div>
+    <div class="stat-details">
       <div class="stat-value" id="stat-expired">{{ stats.expired + stats.disabled }}</div>
       <div class="stat-label">منتهية أو معطلة</div>
     </div>
@@ -93,24 +93,24 @@
 </div>
 
 <!-- Sales & Renewals Today Row -->
-<div class="grid grid-2 mb-4" style="gap:14px;">
-  <div class="card" style="background:linear-gradient(135deg, #065f46, #047857); color:#fff; padding:18px 22px; border-radius:12px;">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
+<div class="grid dashboard-sales-grid mb-3">
+  <div class="card dashboard-sales-card" style="background:linear-gradient(135deg, #065f46, #047857); color:#fff;">
+    <div class="sales-card-body">
       <div>
-        <div style="font-size:0.85rem; color:#a7f3d0; margin-bottom:4px;">💵 مبيعات وتحصيلات اليوم</div>
-        <div style="font-size:1.8rem; font-weight:800; color:#fff;">{{ "{:,.0f}".format(stats.today_sales) }} <span style="font-size:1rem; font-weight:normal;">د.ع</span></div>
+        <div class="sales-title" style="color:#a7f3d0;">💵 مبيعات اليوم</div>
+        <div class="sales-amount">{{ "{:,.0f}".format(stats.today_sales) }} <span class="sales-unit">د.ع</span></div>
       </div>
-      <div style="font-size:2.5rem; opacity:0.8;">💰</div>
+      <div class="sales-icon">💰</div>
     </div>
   </div>
 
-  <div class="card" style="background:linear-gradient(135deg, #1e40af, #2563eb); color:#fff; padding:18px 22px; border-radius:12px;">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
+  <div class="card dashboard-sales-card" style="background:linear-gradient(135deg, #1e40af, #2563eb); color:#fff;">
+    <div class="sales-card-body">
       <div>
-        <div style="font-size:0.85rem; color:#bfdbfe; margin-bottom:4px;">🔄 عدد عمليات التجديد اليوم</div>
-        <div style="font-size:1.8rem; font-weight:800; color:#fff;">{{ stats.today_renewals }} <span style="font-size:1rem; font-weight:normal;">تجديد</span></div>
+        <div class="sales-title" style="color:#bfdbfe;">🔄 تجديدات اليوم</div>
+        <div class="sales-amount">{{ stats.today_renewals }} <span class="sales-unit">تجديد</span></div>
       </div>
-      <div style="font-size:2.5rem; opacity:0.8;">⚡</div>
+      <div class="sales-icon">⚡</div>
     </div>
   </div>
 </div>

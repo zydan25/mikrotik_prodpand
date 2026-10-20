@@ -164,20 +164,51 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggle = document.getElementById('sidebar-toggle');
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebar-overlay');
-  
+  const closeBtn = document.getElementById('sidebar-close-btn');
+
+  function openSidebar() {
+    if (sidebar) sidebar.classList.add('open');
+    if (overlay) overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSidebar() {
+    if (sidebar) sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
   if (toggle) {
-    toggle.addEventListener('click', () => {
-      sidebar?.classList.toggle('open');
-      overlay?.classList.toggle('active');
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (sidebar && sidebar.classList.contains('open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
     });
   }
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeSidebar();
+    });
+  }
+
   if (overlay) {
-    overlay.addEventListener('click', () => {
-      sidebar?.classList.remove('open');
-      overlay.classList.remove('active');
-    });
+    overlay.addEventListener('click', closeSidebar);
   }
-  
+
+  // Close sidebar on link click on small screens
+  document.querySelectorAll('.sidebar-nav .nav-link').forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth <= 900) {
+        closeSidebar();
+      }
+    });
+  });
+
   // Auto-dismiss flash messages
   document.querySelectorAll('.flash-msg').forEach(el => {
     setTimeout(() => el.style.display = 'none', 5000);

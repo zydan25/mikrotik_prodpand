@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+{% block title %}قائمة الاشتراكات{% endblock %}
+{% block page_title %}إدارة اشتراكات البرودباند PPPoE{% endblock %}
+{% block breadcrumb %}الاشتراكات / {{ selected.name if selected else '' }}{% endblock %}
+
+{% block topbar_actions %}
+<div style="display:flex; gap:8px; flex-wrap:wrap;">
+  {% if selected %}
+  <button class="btn btn-outline btn-sm" onclick="syncSubscriptions({{ selected.id }}, this)" style="font-weight:700; color:#059669; border-color:#059669;" title="استيراد وتحديث كافة المشتركين المسجلين في الراوتر">
+    📥 استيراد المشتركين من الراوتر
+  </button>
+  {% endif %}
+  <button class="btn btn-primary btn-sm" onclick="openQuickRenewModal()" style="font-weight:700;">
+    ⚡ تجديد / اشتراك جديد
+  </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+  <!-- Filters Bar with Searchable Dropdowns -->
+  <div class="filter-bar" style="padding:16px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+    {% if devices|length > 1 %}
+    <div style="min-width:180px;">
+      <select class="searchable-select device-select" data-placeholder="اختر الراوتر">
+        {% for d in devices %}
+        <option value="{{ d.id }}" {% if selected and d.id == selected.id %}selected{% endif %}>🖥️ {{ d.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <form method="GET" action="{{ url_for('pppoe.subscriptions') }}" style="display:flex; gap:10px; flex:1; flex-wrap:wrap; align-items:center;">
+      {% if selected %}<input type="hidden" name="device_id" value="{{ selected.id }}">{% endif %}
+
+      <!-- Search Input -->
+      <div class="search-bar" style="flex:2; min-width:200px;">
+        <span class="search-icon">🔍</span>
+        <input type="text" name="q" placeholder="ابحث باسم المشترك، العميل، الهاتف، الملاحظات..." value="{{ q or '' }}">
+      </div>
+
+      <!-- Status Filter -->
+      <div style="min-width:140px;">
+        <select name="status" class="searchable-select" data-placeholder="كل الحالات" onchange="this.form.submit()">
+          <option value="">جميع الحالات</option>
+          <option value="active" {% if status_filter=='active' %}selected{% endif %}>🟢 نشط وساري</option>
+          <option value="disabled" {% if status_filter=='disabled' %}selected{% endif %}>🔴 موقوف ومعطل</option>
+          <option value="expired" {% if status_filter=='expired' %}selected{% endif %}>🟡 منتهي الصلاحية</option>
+        </select>
+      </div>
+
+      <!-- Category Filter -->
+      {% if categories %}
+      <div style="min-width:140px;">
+        <select name="category" class="searchable-select" data-placeholder="فئة الخدمة" onchange="this.form.submit()">
+          <option value="">كل الفئات</option>
+          {% for cat in categories %}
+          <option value="{{ cat }}" {% if category_filter == cat %}selected{% endif %}>🏷️ {{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <!-- Profile Filter -->
+      {% if profiles %}
+      <div style="min-width:150px;">
+        <select name="profile_id" class="searchable-select" data-placeholder="كل الباقات" onchange="this.form.submit()">
+          <option value="">جميع الباقات</option>
+          {% for p in profiles %}
+          <option value="{{ p.id }}" {% if profile_filter == p.id %}selected{% endif %}>📦 {{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <button type="submit" class="btn btn-primary btn-sm" style="font-weight:700; padding:8px 16px;">بحث</button>
+      {% if q or status_filter or profile_filter or category_filter %}
+      <a href="{{ url_for('pppoe.subscriptions', device_id=selected.id if selected else '') }}" class="btn btn-outline btn-sm">إلغاء الفلترة</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Summary Ribbon -->
+  <div style="padding:10px 24px; background:#fff; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; color:#475569;">
+    <div>
+      إجمالي الاشتراكات: <strong>{{ subs.total }}</strong>
+      {% if selected %} | الراوتر: <strong style="color:#0f172a;">{{ selected.name }}</strong> ({{ selected.host }}){% endif %}
+    </div>
+    <div style="font-size:0.8rem; color:#64748b;">
+      صفحة {{ subs.page }} من {{ subs.pages if subs.pages > 0 else 1 }}
+    </div>
+  </div>
+
+  <!-- ================= 1. DESKTOP TABLE VIEW ================= -->
+  <div class="table-wrapper desktop-table-view">
+    <table>
+      <thead>
+        <tr>
+          <th>المشترك (PPPoE)</th>
+          <th>الباقة والسرعة</th>
+          <th>المستهلك (تحميل / رفع)</th>
+          <th>السعة والمتبقي</th>
+          <th>البدء والانتهاء</th>
+          <th>الحالة</th>
+          <th style="text-align:center;">إجراءات سريعة</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in subs.items %}
+        <tr id="sub-row-{{ s.id }}">
+          <!-- 1. Username & Live Status -->
+          <td>
+            <div style="display:flex; align-items:center; gap:8px;">
+              {% if s.is_online %}
+                <span class="status-dot online" title="متصل الآن على الراوتر"></span>
+              {% else %}
+                <span class="status-dot offline" title="غير متصل"></span>
+              {% endif %}
+              <a href="{{ url_for('pppoe.subscription_detail', sub_id=s.id) }}" style="font-weight:800; color:#0f172a; font-size:0.95rem;">
+                {{ s.username }}
+              </a>
+            </div>
+            
+            {% if s.is_online and s.uptime %}
+              <div class="uptime-badge" style="margin-top:4px;">
+                🟢 متصل منذ: {{ s.uptime }} {% if s.current_ip %}({{ s.current_ip }}){% endif %}
+              </div>
+            {% elif s.customer_name %}
+              <div style="font-size:0.78rem; color:#64748b; margin-top:2px;">👤 {{ s.customer_name }}</div>
+            {% endif %}
+          </td>
+
+          <!-- 2. Profile & Speed -->
+          <td>
+            <span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:700;">
+              {{ s.profile.name if s.profile else 'default' }}
+            </span>
+            <div style="font-size:0.75rem; color:#059669; font-weight:700; margin-top:2px;">
+              ⚡ {{ s.profile.rate_limit if s.profile and s.profile.rate_limit else 'مفتوح' }}
+            </div>
+            <div style="font-size:0.72rem; color:#64748b;">
+              🏷️ {{ s.profile.category if s.profile else 'عام' }}
+            </div>
+          </td>
+
+          <!-- 3. Consumed Traffic (Live) -->
+          <td>
+            <div class="traffic-box">
+              <div class="traffic-tx">
+                <span>⬇️ تحميل:</span> <span>{{ s.tx_formatted }}</span>
+              </div>
+              <div class="traffic-rx">
+                <span>⬆️ رفع:</span> <span>{{ s.rx_formatted }}</span>
+              </div>
+              <div style="font-weight:700; color:#1e293b; margin-top:2px;">
+                المجموع: {{ s.consumed_formatted }}
+              </div>
+            </div>
+          </td>
+
+          <!-- 4. Quota & Remaining -->
+          <td>
+            <div style="font-weight:700; color:#1e293b; font-size:0.85rem;">
+              السعة: {{ s.quota_display }}
+            </div>
+            <div style="font-size:0.8rem; color:#059669; font-weight:700; margin-top:2px;">
+              المتبقي: {{ s.remaining_quota_display }}
+            </div>
+          </td>
+
+          <!-- 5. Dates & Remaining Days -->
+          <td>
+            <div style="font-size:0.78rem; color:#64748b;">
+              بدأ: {{ s.started_at.strftime('%Y-%m-%d') if s.started_at else '—' }}
+            </div>
+            <div style="font-weight:700; color:#1e293b; font-size:0.88rem;">
+              ينتهي: {{ s.expires_at.strftime('%Y-%m-%d') if s.expires_at else 'مفتوح' }}
+            </div>
+            <small style="font-weight:700; color:{% if s.days_remaining is not none and s.days_remaining <= 3 %}#ef4444{% elif s.days_remaining is not none and s.days_remaining <= 7 %}#f59e0b{% else %}#10b981{% endif %};">
+              {% if s.days_remaining is not none %}
+                {% if s.days_remaining > 0 %}متبقي {{ s.days_remaining }} يوم{% elif s.days_remaining == 0 %}ينتهي اليوم{% else %}منتهي منذ {{ -s.days_remaining }} يوم{% endif %}
+              {% endif %}
+            </small>
+          </td>
+
+          <!-- 6. Status -->
+          <td>
+            {% if s.disabled %}
+              <span class="badge badge-danger">معطل</span>
+            {% elif s.status == 'expired' %}
+              <span class="badge badge-warning">منتهي</span>
+            {% else %}
+              <span class="badge badge-success">نشط</span>
+            {% endif %}
+          </td>
+
+          <!-- 7. Actions -->
+          <td>
+            <div style="display:flex; gap:6px; justify-content:center;">
+              <button class="btn btn-sm btn-primary" onclick="openQuickRenewModal({{ s.id }}, '{{ s.username }}')" title="تجديد وحفظ فوري">
+                🔄 تجديد
+              </button>
+              <a href="{{ url_for('pppoe.edit_subscription', sub_id=s.id) }}" class="btn btn-sm btn-outline" title="تعديل">
+                ✏️
+              </a>
+              <button class="btn btn-sm btn-outline" style="color:#f59e0b; border-color:#f59e0b;" onclick="toggleDisableSub({{ s.id }}, this)" title="تفعيل / تعطيل">
+                {% if s.disabled %}🟢{% else %}🔴{% endif %}
+              </button>
+              <button class="btn btn-sm btn-outline" style="color:#ef4444; border-color:#ef4444;" onclick="deleteSub({{ s.id }}, '{{ s.username }}')" title="حذف">
+                🗑️
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" style="text-align:center; padding:40px; color:#64748b;">
+            لا توجد اشتراكات تطابق شروط البحث
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ================= 2. MOBILE FULL-WIDTH CARDS VIEW ================= -->
+  <div class="sub-mobile-cards" style="padding:14px;">
+    {% for s in subs.items %}
+    <div class="sub-mobile-card" id="mobile-sub-card-{{ s.id }}">
+      <div class="sub-mobile-header">
+        <div class="sub-mobile-username">
+          {% if s.is_online %}
+            <span class="status-dot online"></span>
+          {% else %}
+            <span class="status-dot offline"></span>
+          {% endif %}
+          <a href="{{ url_for('pppoe.subscription_detail', sub_id=s.id) }}" style="color:#0f172a; text-decoration:none;">
+            {{ s.username }}
+          </a>
+        </div>
+        <div>
+          {% if s.disabled %}
+            <span class="badge badge-danger">معطل</span>
+          {% elif s.status == 'expired' %}
+            <span class="badge badge-warning">منتهي</span>
+          {% else %}
+            <span class="badge badge-success">نشط</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Online Live Badge -->
+      {% if s.is_online and s.uptime %}
+      <div class="uptime-badge" style="width:fit-content;">
+        🟢 متصل الآن منذ: {{ s.uptime }} {% if s.current_ip %}| IP: {{ s.current_ip }}{% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Stats Grid -->
+      <div class="sub-mobile-stats-grid">
+        <div class="sub-mobile-stat-item">
+          <span class="sub-mobile-stat-label">📦 الباقة والسرعة:</span>
+          <span class="sub-mobile-stat-val">{{ s.profile.name if s.profile else 'افتراضي' }} ({{ s.profile.rate_limit if s.profile and s.profile.rate_limit else 'مفتوح' }})</span>
+        </div>
+        <div class="sub-mobile-stat-item">
+          <span class="sub-mobile-stat-label">📊 المستهلك الإجمالي:</span>
+          <span class="sub-mobile-stat-val" style="color:#2563eb;">{{ s.consumed_formatted }}</span>
+        </div>
+        <div class="sub-mobile-stat-item">
+          <span class="sub-mobile-stat-label">⬇️ التحميل / ⬆️ الرفع:</span>
+          <span class="sub-mobile-stat-val" style="font-size:0.8rem;">{{ s.tx_formatted }} / {{ s.rx_formatted }}</span>
+        </div>
+        <div class="sub-mobile-stat-item">
+          <span class="sub-mobile-stat-label">📦 سعة الباقة:</span>
+          <span class="sub-mobile-stat-val">{{ s.quota_display }}</span>
+        </div>
+        <div class="sub-mobile-stat-item">
+          <span class="sub-mobile-stat-label">📅 تاريخ البدء:</span>
+          <span class="sub-mobile-stat-val">{{ s.started_at.strftime('%Y-%m-%d') if s.started_at else '—' }}</span>
+        </div>
+        <div class="sub-mobile-stat-item">
+          <span class="sub-mobile-stat-label">📅 تاريخ الانتهاء:</span>
+          <span class="sub-mobile-stat-val" style="{% if s.days_remaining is not none and s.days_remaining <= 3 %}color:#ef4444;{% endif %}">
+            {{ s.expires_at.strftime('%Y-%m-%d') if s.expires_at else 'مفتوح' }}
+          </span>
+        </div>
+        <div class="sub-mobile-stat-item">
+          <span class="sub-mobile-stat-label">⏱️ المتبقي:</span>
+          <span class="sub-mobile-stat-val" style="font-weight:700;">
+            {% if s.days_remaining is not none %}
+              {% if s.days_remaining > 0 %}
+                <span style="color:#10b981;">{{ s.days_remaining }} يوم</span>
+              {% elif s.days_remaining == 0 %}
+                <span style="color:#f59e0b;">ينتهي اليوم</span>
+              {% else %}
+                <span style="color:#ef4444;">منتهي</span>
+              {% endif %}
+            {% else %}—{% endif %}
+          </span>
+        </div>
+        <div class="sub-mobile-stat-item">
+          <span class="sub-mobile-stat-label">💵 السعر:</span>
+          <span class="sub-mobile-stat-val">{{ "{:,.0f}".format(s.price or (s.profile.price if s.profile else 0)) }} د.ع</span>
+        </div>
+      </div>
+
+      <!-- Customer details if present -->
+      {% if s.customer_name or s.customer_phone or s.comment %}
+      <div class="sub-mobile-customer-info">
+        {% if s.customer_name %}<span>👤 <strong>{{ s.customer_name }}</strong></span>{% endif %}
+        {% if s.customer_phone %}<span>📞 <a href="tel:{{ s.customer_phone }}" style="color:#2563eb; font-weight:700;">{{ s.customer_phone }}</a></span>{% endif %}
+        {% if s.comment %}<span style="color:#94a3b8;">📝 {{ s.comment }}</span>{% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Quick Action Buttons Touch Friendly -->
+      <div class="sub-mobile-actions">
+        <button class="btn btn-primary" onclick="openQuickRenewModal({{ s.id }}, '{{ s.username }}')">
+          🔄 تجديد وحفظ
+        </button>
+        <a href="{{ url_for('pppoe.edit_subscription', sub_id=s.id) }}" class="btn btn-outline">
+          ✏️ تعديل
+        </a>
+        <button class="btn btn-outline" style="color:#f59e0b; border-color:#f59e0b;" onclick="toggleDisableSub({{ s.id }}, this)">
+          {% if s.disabled %}تفعيل{% else %}تعطيل{% endif %}
+        </button>
+        <button class="btn btn-outline" style="color:#ef4444; border-color:#ef4444;" onclick="deleteSub({{ s.id }}, '{{ s.username }}')">
+          🗑️
+        </button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if subs.pages > 1 %}
+  <div style="padding:16px 24px; display:flex; justify-content:center; gap:6px; border-top:1px solid #f1f5f9; background:#fff;">
+    {% if subs.has_prev %}
+    <a href="{{ url_for('pppoe.subscriptions', page=subs.prev_num, q=q, status=status_filter, profile_id=profile_filter, device_id=selected.id if selected else '') }}" class="btn btn-outline btn-sm">&larr; السابق</a>
+    {% endif %}
+
+    <span style="padding:6px 12px; font-size:0.875rem; color:#475569;">{{ subs.page }} / {{ subs.pages }}</span>
+
+    {% if subs.has_next %}
+    <a href="{{ url_for('pppoe.subscriptions', page=subs.next_num, q=q, status=status_filter, profile_id=profile_filter, device_id=selected.id if selected else '') }}" class="btn btn-outline btn-sm">التالي &rarr;</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function deleteSub(subId, username) {
+  showConfirm({
+    title: 'تأكيد حذف المشترك',
+    message: `هل أنت متأكد من حذف المشترك "${username}" نهائياً من الراوتر وقاعدة البيانات؟ هذا الإجراء لا يمكن التراجع عنه.`,
+    confirmText: 'نعم، احذف المشترك',
+    confirmClass: 'btn-danger',
+    onConfirm: async () => {
+      try {
+        const res = await apiPost(`/subscriptions/${subId}/delete`);
+        if (res.ok) {
+          Toast.success(res.message);
+          const row = document.getElementById(`sub-row-${subId}`);
+          if (row) row.remove();
+          const card = document.getElementById(`mobile-sub-card-${subId}`);
+          if (card) card.remove();
+        } else {
+          Toast.error(res.message);
+        }
+      } catch(e) {
+        Toast.error('خطأ في الاتصال بالخادم');
+      }
+    }
+  });
+}
+
+function toggleDisableSub(subId, btn) {
+  showConfirm({
+    title: 'تأكيد تغيير حالة المشترك',
+    message: 'هل تريد تغيير حالة هذا المشترك (تفعيل أو تعطيل الاتصال) في الراوتر؟',
+    confirmText: 'تأكيد',
+    confirmClass: 'btn-warning',
+    onConfirm: async () => {
+      const restore = btnLoading(btn);
+      try {
+        const res = await apiPost(`/subscriptions/${subId}/toggle-disable`);
+        if (res.ok) {
+          Toast.success(res.message);
+          setTimeout(() => location.reload(), 800);
+        } else {
+          Toast.error(res.message);
+        }
+      } catch(e) {
+        Toast.error('خطأ في الاتصال');
+      } finally {
+        restore();
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

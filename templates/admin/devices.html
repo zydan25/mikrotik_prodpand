@@ -1,0 +1,51 @@
+﻿{% extends "base.html" %}
+{% block title %}أجهزة MikroTik{% endblock %}
+{% block page_title %}أجهزة MikroTik{% endblock %}
+{% block topbar_actions %}<a href="{{ url_for('admin.add_device') }}" class="btn btn-primary btn-sm">➕ إضافة جهاز</a>{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="table-wrapper">
+    {% if devices %}
+    <table>
+      <thead><tr><th>الاسم</th><th>العنوان</th><th>المنفذ</th><th>الإصدار</th><th>الحالة</th><th>آخر اتصال</th><th>الإجراءات</th></tr></thead>
+      <tbody>
+        {% for d in devices %}
+        <tr>
+          <td class="fw-700">{{ d.name }}</td>
+          <td class="mono">{{ d.host }}</td>
+          <td class="mono fs-sm">{{ d.api_port }}</td>
+          <td class="fs-sm mono">{{ d.ros_version or '?' }}</td>
+          <td><span class="flex-gap"><span class="status-dot {{ d.last_status or 'unknown' }}" id="device-status-{{ d.id }}"></span>{{ d.last_status or 'unknown' }}</span></td>
+          <td class="text-muted fs-sm">{{ d.last_seen.strftime('%Y-%m-%d %H:%M') if d.last_seen else '—' }}</td>
+          <td>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button class="btn btn-outline btn-xs" id="test-btn-{{ d.id }}" onclick="testDevice({{ d.id }})">🔌 فحص</button>
+              <a href="http://{{ d.host }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-xs" style="color:#2563eb;font-weight:700;" title="فتح صفحة ويب الراوتر (WebFig) في تبويب جديد مستقل">🌐 فتح ويب</a>
+              <a href="{{ url_for('admin.edit_device', device_id=d.id) }}" class="btn btn-outline btn-xs" title="تعديل">✏️</a>
+              <button class="btn btn-danger btn-xs" onclick="deleteDevice({{ d.id }}, '{{ d.name }}')" title="حذف">🗑</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state"><span class="empty-icon">🖥️</span><h3>لا توجد أجهزة</h3><p>أضف جهاز MikroTik للبدء</p><a href="{{ url_for('admin.add_device') }}" class="btn btn-primary mt-2">➕ إضافة جهاز</a></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+async function deleteDevice(id, name) {
+  showConfirm({ title: 'حذف الجهاز', message: `هل تريد حذف جهاز "${name}" وجميع بياناته؟`, confirmText: 'حذف', confirmClass: 'btn-danger',
+    onConfirm: async () => {
+      const res = await apiPost(`/admin/devices/${id}/delete`);
+      if (res.ok) { Toast.success(res.message); document.querySelector(`button[onclick="deleteDevice(${id},'${name}')"]`)?.closest('tr')?.remove(); }
+      else Toast.error(res.message);
+    }
+  });
+}
+</script>
+{% endblock %}

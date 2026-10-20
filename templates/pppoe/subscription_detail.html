@@ -1,0 +1,189 @@
+﻿{% extends "base.html" %}
+{% block title %}تفاصيل: {{ sub.username }}{% endblock %}
+{% block page_title %}تفاصيل الاشتراك{% endblock %}
+{% block breadcrumb %}الاشتراكات / {{ sub.username }}{% endblock %}
+
+{% block topbar_actions %}
+{% if current_user.is_admin or current_user.can_edit %}
+<a href="{{ url_for('pppoe.edit_subscription', sub_id=sub.id) }}" class="btn btn-outline btn-sm">✏️ تعديل</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div style="display:grid; gap:20px; grid-template-columns:1fr 1fr;">
+
+<!-- بيانات الحساب -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">🔐 بيانات الحساب</span>
+    <span class="badge {% if sub.disabled %}badge-disabled{% elif sub.status=='expired' %}badge-expired{% else %}badge-active{% endif %}">
+      {% if sub.disabled %}موقوف{% elif sub.status=='expired' %}منتهي{% else %}نشط{% endif %}
+    </span>
+  </div>
+  <div class="card-body">
+    <table style="width:100%; border:none;">
+      <tr><td class="text-muted fs-sm" style="padding:8px 0; width:40%;">اسم المستخدم</td><td class="mono fw-700 text-primary">{{ sub.username }}</td></tr>
+      {% if current_user.is_admin or current_user.can_view_password %}
+      <tr><td class="text-muted fs-sm" style="padding:8px 0;">كلمة المرور</td><td class="mono">{{ sub.password }}</td></tr>
+      {% else %}
+      <tr><td class="text-muted fs-sm" style="padding:8px 0;">كلمة المرور</td><td class="mono text-muted">••••••••</td></tr>
+      {% endif %}
+      <tr><td class="text-muted fs-sm" style="padding:8px 0;">الباقة</td><td>{% if sub.profile %}<span class="badge" style="background:var(--primary-light);color:var(--primary);">{{ sub.profile.name }}</span>{% else %}—{% endif %}</td></tr>
+      <tr><td class="text-muted fs-sm" style="padding:8px 0;">نوع الخدمة</td><td class="mono">{{ sub.service }}</td></tr>
+      {% if sub.static_ip %}<tr><td class="text-muted fs-sm" style="padding:8px 0;">IP ثابت</td><td class="mono text-success">{{ sub.static_ip }}</td></tr>{% endif %}
+      {% if sub.caller_id %}<tr><td class="text-muted fs-sm" style="padding:8px 0;">Caller-ID</td><td class="mono fs-sm">{{ sub.caller_id }}</td></tr>{% endif %}
+      <tr><td class="text-muted fs-sm" style="padding:8px 0;">معرف الراوتر</td><td class="mono fs-sm text-muted">{{ sub.router_secret_id or '—' }}</td></tr>
+      <tr><td class="text-muted fs-sm" style="padding:8px 0;">الجهاز</td><td>{{ sub.device.name }}</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- بيانات العميل والاشتراك -->
+<div class="card">
+  <div class="card-header"><span class="card-title">👤 بيانات العميل</span></div>
+  <div class="card-body">
+    <table style="width:100%; border:none;">
+      <tr><td class="text-muted fs-sm" style="padding:8px 0; width:40%;">الاسم</td><td class="fw-600">{{ sub.customer_name or '—' }}</td></tr>
+      <tr><td class="text-muted fs-sm" style="padding:8px 0;">الهاتف</td><td class="mono">{{ sub.customer_phone or '—' }}</td></tr>
+      <tr><td class="text-muted fs-sm" style="padding:8px 0;">العنوان</td><td>{{ sub.customer_address or '—' }}</td></tr>
+      <tr><td class="text-muted fs-sm" style="padding:8px 0;">تاريخ البدء</td><td>{{ sub.started_at.strftime('%Y-%m-%d') if sub.started_at else '—' }}</td></tr>
+      <tr><td class="text-muted fs-sm" style="padding:8px 0;">تاريخ الانتهاء</td>
+        <td>{% if sub.expires_at %}
+          {% set days = (sub.expires_at - now).days %}
+          <span style="font-weight:600; color:{% if days < 0 %}var(--danger){% elif days < 7 %}var(--warning){% else %}var(--success){% endif %}">
+            {{ sub.expires_at.strftime('%Y-%m-%d') }} ({% if days < 0 %}منتهي{% else %}{{ days }} يوم{% endif %})
+          </span>
+        {% else %}—{% endif %}</td>
+      </tr>
+      <tr><td class="text-muted fs-sm" style="padding:8px 0;">أضافه</td><td>{{ sub.created_by.full_name if sub.created_by else '—' }}</td></tr>
+      <tr><td class="text-muted fs-sm" style="padding:8px 0;">تاريخ الإضافة</td><td class="fs-sm">{{ sub.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+    </table>
+  </div>
+</div>
+
+</div><!-- end grid -->
+
+<!-- Actions Row -->
+<div class="card mt-2" style="max-width:600px;">
+  <div class="card-header"><span class="card-title">⚡ الإجراءات</span></div>
+  <div class="card-body" style="display:flex; gap:10px; flex-wrap:wrap;">
+    {% if current_user.is_admin or current_user.can_edit %}
+    <button class="btn {% if sub.disabled %}btn-success{% else %}btn-warning{% endif %}"
+            onclick="toggleDisable({{ sub.id }}, '{{ sub.username }}', {{ 'true' if sub.disabled else 'false' }})">
+      {% if sub.disabled %}▶ تفعيل الاشتراك{% else %}⏸ تعطيل الاشتراك{% endif %}
+    </button>
+    {% endif %}
+    {% if current_user.is_admin or current_user.can_disconnect %}
+    <button class="btn btn-warning" onclick="disconnectByUsername('{{ sub.device.id }}', '{{ sub.username }}')">🔌 قطع الاتصال الحالي</button>
+    {% endif %}
+    {% if (current_user.is_admin or current_user.can_view_finance) %}
+    <button class="btn btn-success" onclick="Modal.open('payment-modal')">💰 تسجيل دفعة</button>
+    {% endif %}
+    {% if current_user.is_admin or current_user.can_delete %}
+    <button class="btn btn-danger" onclick="deleteSubscription({{ sub.id }}, '{{ sub.username }}')">🗑 حذف الاشتراك</button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Payments History -->
+{% if payments and (current_user.is_admin or current_user.can_view_finance) %}
+<div class="card mt-2">
+  <div class="card-header"><span class="card-title">💳 سجل المدفوعات</span></div>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>التاريخ</th><th>المبلغ</th><th>النوع</th><th>جمعه</th><th>ملاحظات</th></tr>
+      </thead>
+      <tbody>
+        {% for p in payments %}
+        <tr>
+          <td class="fs-sm">{{ p.paid_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="fw-700 text-success">{{ p.amount }} {{ p.currency }}</td>
+          <td>
+            {% if p.payment_type == 'renewal' %}تجديد
+            {% elif p.payment_type == 'new' %}اشتراك جديد
+            {% else %}{{ p.payment_type }}{% endif %}
+          </td>
+          <td>{{ p.collected_by.full_name if p.collected_by else '—' }}</td>
+          <td class="text-muted fs-sm">{{ p.notes or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Payment Modal -->
+<div class="modal-overlay" id="payment-modal">
+  <div class="modal-box modal-sm">
+    <div class="modal-header">
+      <h3 class="modal-title">💰 تسجيل دفعة</h3>
+      <button class="modal-close" onclick="Modal.close('payment-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">المبلغ <span class="required">*</span></label>
+        <input type="number" id="pay-amount" class="form-control" placeholder="0.00" step="0.01" min="0">
+      </div>
+      <div class="form-row form-row-2">
+        <div class="form-group">
+          <label class="form-label">العملة</label>
+          <select id="pay-currency" class="form-control">
+            <option value="IQD">IQD</option>
+            <option value="USD">USD</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">عدد الأشهر</label>
+          <input type="number" id="pay-months" class="form-control" value="1" min="1" max="24">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">ملاحظات</label>
+        <input type="text" id="pay-notes" class="form-control" placeholder="اختياري">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="Modal.close('payment-modal')">إلغاء</button>
+      <button class="btn btn-success" id="pay-submit-btn" onclick="submitPayment({{ sub.id }})">💳 تسجيل</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function submitPayment(subId) {
+  const amount = parseFloat(document.getElementById('pay-amount').value || 0);
+  if (amount <= 0) { Toast.error('يرجى إدخال مبلغ صحيح'); return; }
+  const btn = document.getElementById('pay-submit-btn');
+  const restore = btnLoading(btn);
+  try {
+    const res = await apiPost(`/accounting/add-payment/${subId}`, {
+      amount, currency: document.getElementById('pay-currency').value,
+      months: parseInt(document.getElementById('pay-months').value || 1),
+      notes: document.getElementById('pay-notes').value,
+      payment_type: 'renewal'
+    });
+    if (res.ok) { Toast.success(res.message); Modal.close('payment-modal'); setTimeout(() => location.reload(), 1500); }
+    else Toast.error(res.message);
+  } catch(e) { Toast.error('خطأ في الاتصال'); }
+  finally { restore(); }
+}
+
+async function disconnectByUsername(deviceId, username) {
+  showConfirm({
+    title: 'قطع الاتصال',
+    message: `هل تريد قطع اتصال "${username}" من الراوتر فوراً؟`,
+    confirmText: 'قطع الاتصال',
+    confirmClass: 'btn-warning',
+    onConfirm: async () => {
+      const res = await apiPost('/api/disconnect-session', {device_id: parseInt(deviceId), session_id: username});
+      if (res.ok) Toast.success(res.message);
+      else Toast.error(res.message);
+    }
+  });
+}
+</script>
+{% endblock %}

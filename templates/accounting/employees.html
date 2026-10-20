@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}سندات وأرصدة الموظفين{% endblock %}
+{% block page_title %}سندات وحسابات الموظفين (التحصيل والتسويات){% endblock %}
+
+{% block breadcrumb %}المالية / حسابات الموظفين{% endblock %}
+
+{% block topbar_actions %}
+<div style="display:flex; gap:8px;">
+  <a href="{{ url_for('accounting.index') }}" class="btn btn-outline btn-sm">
+    💰 الملخص المالي العام
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Top Summary Banner -->
+<div class="card mb-4" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #fff; padding:22px; border-radius:16px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+    <div>
+      <h2 style="font-size:1.35rem; margin:0 0 6px 0; color:#fff; font-weight:800;">
+        🧾 متابعة عهد وسندات الموظفين
+      </h2>
+      <p style="margin:0; font-size:0.88rem; color:#94a3b8;">
+        مراقبة المبالغ المحصلة في ذمم موظفي التحصيل، تسجيل سندات القبض، وتصفير الأرصدة
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Employees Grid -->
+<h3 style="font-size:1.1rem; font-weight:800; color:#0f172a; margin-bottom:14px;">👥 كشوفات حساب الموظفين</h3>
+<div class="grid grid-3 mb-4" style="gap:16px;">
+  {% for d in employees_data %}
+  <div class="emp-card {% if d.balance > 0 %}has-balance{% else %}cleared{% endif %}">
+    <div class="emp-header">
+      <div>
+        <div class="emp-name">{{ d.user.full_name }}</div>
+        <div class="emp-role">@{{ d.user.username }} • {% if d.user.is_admin %}مدير{% elif d.user.role == 'supervisor' %}مشرف{% else %}موظف تحصيل{% endif %}</div>
+      </div>
+      <div>
+        {% if d.balance > 0 %}
+          <span class="badge badge-danger">في ذمته مبالغ</span>
+        {% else %}
+          <span class="badge badge-success">حساب مصفّى</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Balance Box -->
+    <div class="emp-balance-box">
+      <div>
+        <div style="font-size:0.8rem; color:#64748b; margin-bottom:2px;">المتبقي في ذمته حالياً:</div>
+        <div class="emp-balance-amount {% if d.balance > 0 %}danger{% else %}success{% endif %}">
+          {{ "{:,.0f}".format(d.balance) }} <small style="font-size:0.9rem; font-weight:normal;">د.ع</small>
+        </div>
+      </div>
+      <div style="text-align:left; font-size:0.8rem; color:#64748b;">
+        <div>تم تحصيله: <strong>{{ "{:,.0f}".format(d.collected) }}</strong></div>
+        <div>تم تسليمه: <strong>{{ "{:,.0f}".format(d.settled) }}</strong></div>
+      </div>
+    </div>
+
+    <!-- Actions Row -->
+    <div class="emp-actions-row">
+      <button class="btn btn-primary" onclick="openSettlementModal({{ d.user.id }}, '{{ d.user.full_name }}', {{ d.balance }})">
+        💵 إضافة سند تسوية
+      </button>
+
+      {% if current_user.is_admin and d.balance > 0 %}
+      <button class="btn btn-outline" style="color:#ef4444; border-color:#ef4444;" onclick="confirmZeroBalance({{ d.user.id }}, '{{ d.user.full_name }}', {{ d.balance }})">
+        🎯 تصفير
+      </button>
+      {% endif %}
+
+      <a href="{{ url_for('accounting.employee_report', user_id=d.user.id) }}" class="btn btn-outline">
+        📊 التقرير الشهري
+      </a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ================= RECENT SETTLEMENTS TABLE ================= -->
+<div class="card">
+  <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+    <div>
+      <h3 class="card-title">آخر سندات القبض والتسويات المسجلة</h3>
+      <div style="font-size:0.8rem; color:var(--text-secondary);">سجل المبالغ المستلمة من الموظفين</div>
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>رقم السند</th>
+          <th>الموظف</th>
+          <th>المبلغ المسلم</th>
+          <th>نوع السند</th>
+          <th>التاريخ والوقت</th>
+          <th>المستلم (المدير)</th>
+          <th>ملاحظات</th>
+          <th>طباعة</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in recent_settlements %}
+        <tr>
+          <td>
+            <strong style="color:#0f172a; font-family:monospace;">{{ s.receipt_number or '—' }}</strong>
+          </td>
+          <td>
+            <div style="font-weight:700;">{{ s.user.full_name }}</div>
+            <small style="color:#64748b;">@{{ s.user.username }}</small>
+          </td>
+          <td style="font-weight:800; color:#059669; font-size:1rem;">
+            {{ "{:,.0f}".format(s.amount) }} {{ s.currency }}
+          </td>
+          <td>
+            {% if s.settlement_type == 'zeroing' %}
+              <span class="badge badge-danger">تصفير شامل</span>
+            {% else %}
+              <span class="badge badge-success">سند قبض تسوية</span>
+            {% endif %}
+          </td>
+          <td>{{ s.settled_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>{{ s.settled_by.full_name if s.settled_by else 'النظام' }}</td>
+          <td>{{ s.notes or '—' }}</td>
+          <td>
+            <a href="{{ url_for('accounting.print_settlement', settlement_id=s.id) }}" target="_blank" class="btn btn-sm btn-outline">
+              🖨️ طباعة
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" style="text-align:center; padding:30px; color:#64748b;">
+            لا توجد سندات تسوية مسجلة حتى الآن
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ================= MODAL: ADD SETTLEMENT ================= -->
+<div class="modal-overlay" id="settlement-modal">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header">
+      <h3 class="modal-title">💵 تسجيل سند قبض / تسوية موظف</h3>
+      <button class="modal-close" data-close-modal>&times;</button>
+    </div>
+    <form id="settlement-form" onsubmit="submitSettlement(event)">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-body">
+        <input type="hidden" name="user_id" id="settlement-user-id">
+
+        <div style="padding:12px; background:#eff6ff; border-radius:8px; border:1px solid #bfdbfe; margin-bottom:14px;">
+          <div style="font-size:0.85rem; color:#1e40af;">الموظف: <strong id="settlement-user-name"></strong></div>
+          <div style="font-size:0.85rem; color:#1e40af; margin-top:4px;">الرصيد المتبقي في ذمته: <strong id="settlement-curr-balance" style="color:#ef4444; font-size:1rem;"></strong></div>
+        </div>
+
+        <div class="form-group mb-3">
+          <label class="form-label">المبلغ المسلم (د.ع) *</label>
+          <input type="number" name="amount" id="settlement-amount" class="form-input" required step="any" placeholder="المبلغ">
+        </div>
+
+        <div class="form-group mb-3">
+          <label class="form-label">رقم الإيصال / السند (اختياري)</label>
+          <input type="text" name="receipt_number" class="form-input" placeholder="سيتم إنشاؤه تلقائياً إن ترك فارغاً">
+        </div>
+
+        <div class="form-group mb-3">
+          <label class="form-label">ملاحظات السند (اختياري)</label>
+          <textarea name="notes" class="form-input" rows="2" placeholder="مثلاً: دفعة تحصيل أسبوعية..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" data-close-modal>إلغاء</button>
+        <button type="submit" id="settlement-submit-btn" class="btn btn-primary" style="font-weight:700;">
+          💾 حفظ وطباعة السند
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

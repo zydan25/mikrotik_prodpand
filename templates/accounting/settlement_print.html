@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>سند قبض رقم {{ s.receipt_number }}</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap">
+  <style>
+    body {
+      font-family: 'Cairo', sans-serif;
+      margin: 0;
+      padding: 40px;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .voucher-paper {
+      max-width: 680px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 30px;
+      border: 2px solid #cbd5e1;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      font-size: 0.95rem;
+    }
+    .amount-box {
+      background: #f1f5f9;
+      border: 2px dashed #94a3b8;
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #059669;
+      margin: 20px 0;
+    }
+    .signatures {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 50px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+    }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .voucher-paper { border: 1.5px solid #000; box-shadow: none; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="voucher-paper">
+  <div class="header">
+    <div>
+      <h2 style="margin:0; font-size:1.4rem;">سند قبض وتسوية مالية</h2>
+      <div style="font-size:0.85rem; color:#64748b;">منظومة إدارة اشتراكات PPPoE</div>
+    </div>
+    <div style="text-align:left;">
+      <div style="font-weight:700;">رقم السند: <span style="font-family:monospace;">{{ s.receipt_number }}</span></div>
+      <div style="font-size:0.85rem; color:#64748b;">التاريخ: {{ s.settled_at.strftime('%Y-%m-%d %H:%M') }}</div>
+    </div>
+  </div>
+
+  <div class="amount-box">
+    المبلغ المستلم: {{ "{:,.0f}".format(s.amount) }} {{ s.currency }}
+  </div>
+
+  <div class="row">
+    <span>استلمنا من الموظف / المحصل:</span>
+    <strong>{{ s.user.full_name }} (@{{ s.user.username }})</strong>
+  </div>
+
+  <div class="row">
+    <span>نوع السند:</span>
+    <strong>{% if s.settlement_type == 'zeroing' %}تصفير شامل للرصيد{% else %}سند قبض تسوية اشتراكات{% endif %}</strong>
+  </div>
+
+  <div class="row">
+    <span>المدير المستلم:</span>
+    <strong>{{ s.settled_by.full_name if s.settled_by else 'مدير النظام' }}</strong>
+  </div>
+
+  <div class="row">
+    <span>ملاحظات:</span>
+    <span>{{ s.notes or 'تسوية عهدة اشتراكات برودباند' }}</span>
+  </div>
+
+  <div class="signatures">
+    <div style="text-align:center;">
+      <div style="margin-bottom:40px;">توقيع الموظف المسلم:</div>
+      <div>___________________</div>
+    </div>
+    <div style="text-align:center;">
+      <div style="margin-bottom:40px;">توقيع واستلام المدير:</div>
+      <div>___________________</div>
+    </div>
+  </div>
+</div>
+
+<div class="no-print" style="text-align:center; margin-top:20px;">
+  <button onclick="window.print()" style="padding:10px 24px; font-size:1rem; cursor:pointer; font-weight:700; background:#2563eb; color:#fff; border:none; border-radius:8px;">
+    🖨️ طباعة السند الآن
+  </button>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,24 @@
+﻿{% extends "base.html" %}
+{% block title %}تقارير الموظفين{% endblock %}
+{% block page_title %}تقرير الموظفين{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header"><span class="card-title">📈 أداء الموظفين</span></div>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>الموظف</th><th>المستخدم</th><th>الاشتراكات المضافة</th><th>إجمالي المحصّل</th></tr></thead>
+      <tbody>
+        {% for row in employee_stats %}
+        <tr>
+          <td class="fw-600">{{ row.full_name }}</td>
+          <td class="mono">{{ row.username }}</td>
+          <td><span class="badge badge-active">{{ row.subs_created or 0 }}</span></td>
+          <td class="fw-700 text-success">{{ "%.0f"|format(row.total_collected or 0) }} IQD</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

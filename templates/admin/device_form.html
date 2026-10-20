@@ -1,0 +1,38 @@
+﻿{% extends "base.html" %}
+{% block title %}{% if device %}تعديل الجهاز{% else %}إضافة جهاز{% endif %}{% endblock %}
+{% block page_title %}{% if device %}تعديل: {{ device.name }}{% else %}إضافة جهاز MikroTik{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width:600px;margin:0 auto;">
+<div class="card">
+  <div class="card-header"><span class="card-title">🖥️ بيانات جهاز MikroTik</span><a href="{{ url_for('admin.devices') }}" class="btn btn-outline btn-sm">← عودة</a></div>
+  <div class="card-body">
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-row form-row-2">
+        <div class="form-group"><label class="form-label">اسم الجهاز <span class="required">*</span></label><input type="text" name="name" class="form-control" value="{{ device.name if device else '' }}" required></div>
+        <div class="form-group"><label class="form-label">العنوان (IP/Domain) <span class="required">*</span></label><input type="text" name="host" class="form-control" value="{{ device.host if device else '' }}" placeholder="192.168.1.1" required style="font-family:monospace;"></div>
+      </div>
+      <div class="form-row form-row-2">
+        <div class="form-group"><label class="form-label">منفذ API الثنائي</label><input type="number" name="api_port" class="form-control" value="{{ device.api_port if device else 8728 }}" style="font-family:monospace;"></div>
+        <div class="form-group"><label class="form-label">منفذ REST API (v7)</label><input type="number" name="rest_port" class="form-control" value="{{ device.rest_port if device else 443 }}" style="font-family:monospace;"></div>
+      </div>
+      <div class="form-row form-row-2">
+        <div class="form-group"><label class="form-label">اسم مستخدم الراوتر <span class="required">*</span></label><input type="text" name="username" class="form-control" value="{{ device.username if device else '' }}" required style="font-family:monospace;"></div>
+        <div class="form-group"><label class="form-label">كلمة المرور {% if not device %}<span class="required">*</span>{% endif %}</label><input type="password" name="password" class="form-control" placeholder="{% if device %}اترك فارغاً لعدم التغيير{% endif %}" {% if not device %}required{% endif %}></div>
+      </div>
+      <div class="form-row form-row-2" style="margin-bottom:20px;">
+        <label class="form-check"><input type="checkbox" name="use_ssl" {% if device and device.use_ssl %}checked{% endif %}><span>تفعيل SSL للـ API الثنائي</span></label>
+        <label class="form-check"><input type="checkbox" name="use_rest" {% if device and device.use_rest %}checked{% endif %}><span>استخدام REST API (RouterOS v7+)</span></label>
+      </div>
+      <div class="form-group"><label class="form-label">الموقع/الفرع</label><input type="text" name="location" class="form-control" value="{{ device.location if device else '' }}" placeholder="مثال: الفرع الرئيسي — بغداد"></div>
+      <div class="form-group"><label class="form-label">ملاحظات</label><textarea name="notes" class="form-control" rows="2">{{ device.notes if device else '' }}</textarea></div>
+      <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+        <a href="{{ url_for('admin.devices') }}" class="btn btn-outline">إلغاء</a>
+        <button type="submit" class="btn btn-primary">{% if device %}💾 حفظ{% else %}✅ إضافة الجهاز{% endif %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+</div>
+{% endblock %}

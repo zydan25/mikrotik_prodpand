@@ -1,0 +1,59 @@
+﻿{% extends "base.html" %}
+{% block title %}إدارة الموظفين{% endblock %}
+{% block page_title %}الموظفون والصلاحيات{% endblock %}
+{% block topbar_actions %}<a href="{{ url_for('admin.add_user') }}" class="btn btn-primary btn-sm">➕ موظف جديد</a>{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الصلاحيات</th><th>الحالة</th><th>آخر دخول</th><th>إجراءات</th></tr></thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td class="fw-600">{{ u.full_name }}</td>
+          <td class="mono">{{ u.username }}</td>
+          <td><span class="badge badge-{{ u.role }}">{{ {'admin':'مسؤول','supervisor':'مشرف','employee':'موظف','readonly':'قراءة فقط'}.get(u.role, u.role) }}</span></td>
+          <td class="fs-sm">
+            {% if u.can_add %}✅إضافة {% endif %}
+            {% if u.can_edit %}✏️تعديل {% endif %}
+            {% if u.can_delete %}🗑حذف {% endif %}
+            {% if u.can_disconnect %}🔌قطع {% endif %}
+            {% if u.can_view_finance %}💰مالية{% endif %}
+          </td>
+          <td>
+            <span class="badge {% if u.is_active %}badge-active{% else %}badge-disabled{% endif %}" id="user-status-{{ u.id }}">
+              {% if u.is_active %}فعّال{% else %}موقوف{% endif %}
+            </span>
+          </td>
+          <td class="text-muted fs-sm">{{ u.last_login.strftime('%Y-%m-%d %H:%M') if u.last_login else '—' }}</td>
+          <td>
+            <div style="display:flex;gap:6px;">
+              <a href="{{ url_for('admin.edit_user', user_id=u.id) }}" class="btn btn-outline btn-xs">✏️ تعديل</a>
+              {% if u.id != current_user.id %}
+              <button class="btn btn-xs {% if u.is_active %}btn-warning{% else %}btn-success{% endif %}"
+                      onclick="toggleUser({{ u.id }}, this)">{% if u.is_active %}⏸{% else %}▶{% endif %}</button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+async function toggleUser(userId, btn) {
+  const res = await apiPost(`/admin/users/${userId}/toggle`);
+  if (res.ok) {
+    Toast.success(res.message);
+    const badge = document.getElementById(`user-status-${userId}`);
+    if (badge) { badge.className = `badge ${res.is_active ? 'badge-active':'badge-disabled'}`; badge.textContent = res.is_active ? 'فعّال':'موقوف'; }
+    btn.textContent = res.is_active ? '⏸' : '▶';
+    btn.className = `btn btn-xs ${res.is_active ? 'btn-warning':'btn-success'}`;
+  } else Toast.error(res.message);
+}
+</script>
+{% endblock %}

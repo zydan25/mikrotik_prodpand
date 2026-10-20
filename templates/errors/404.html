@@ -1,0 +1,6 @@
+﻿{% extends "base.html" %}
+{% block title %}404 - الصفحة غير موجودة{% endblock %}
+{% block page_title %}404{% endblock %}
+{% block content %}
+<div class="empty-state card" style="padding:80px 24px;"><span class="empty-icon">🔍</span><h3>الصفحة غير موجودة</h3><p>الصفحة التي تبحث عنها غير موجودة أو تم نقلها</p><a href="{{ url_for('pppoe.dashboard') }}" class="btn btn-primary mt-2">← العودة للرئيسية</a></div>
+{% endblock %}

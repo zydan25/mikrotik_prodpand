@@ -1,0 +1,29 @@
+﻿{% extends "base.html" %}
+{% block title %}لوحة الإدارة{% endblock %}
+{% block page_title %}لوحة الإدارة{% endblock %}
+
+{% block content %}
+<div class="grid grid-4 mb-3">
+  <div class="stat-card stat-primary"><div class="stat-icon">🖥️</div><div class="stat-value">{{ devices|length }}</div><div class="stat-label">الأجهزة</div></div>
+  <div class="stat-card stat-success"><div class="stat-icon">👥</div><div class="stat-value">{{ total_active }}</div><div class="stat-label">اشتراكات نشطة</div></div>
+  <div class="stat-card stat-warning"><div class="stat-icon">📋</div><div class="stat-value">{{ total_subs }}</div><div class="stat-label">إجمالي الاشتراكات</div></div>
+  <div class="stat-card"><div class="stat-icon">👤</div><div class="stat-value">{{ users|length }}</div><div class="stat-label">الموظفين</div></div>
+</div>
+<div class="grid grid-2">
+  <div class="card"><div class="card-header"><span class="card-title">🖥️ الأجهزة</span><a href="{{ url_for('admin.add_device') }}" class="btn btn-primary btn-sm">+ جديد</a></div>
+    <div class="table-wrapper"><table><thead><tr><th>الاسم</th><th>العنوان</th><th>الإصدار</th><th>الحالة</th><th></th></tr></thead>
+    <tbody>{% for d in devices %}<tr>
+      <td class="fw-600">{{ d.name }}</td><td class="mono fs-sm">{{ d.host }}:{{ d.api_port }}</td>
+      <td class="fs-sm">{{ d.ros_version or '?' }}</td>
+      <td><span class="status-dot {{ d.last_status or 'unknown' }}" id="device-status-{{ d.id }}"></span></td>
+      <td><button class="btn btn-outline btn-xs" id="test-btn-{{ d.id }}" onclick="testDevice({{ d.id }})">فحص</button></td>
+    </tr>{% endfor %}</tbody></table></div></div>
+  <div class="card"><div class="card-header"><span class="card-title">📋 آخر العمليات</span></div>
+    <div class="table-wrapper"><table><thead><tr><th>المستخدم</th><th>العملية</th><th>الوقت</th></tr></thead>
+    <tbody>{% for log in recent_logs %}<tr>
+      <td class="fs-sm">{{ log.user.username if log.user else '—' }}</td>
+      <td class="fs-sm">{{ log.description[:50] if log.description else log.action }}</td>
+      <td class="text-muted fs-sm">{{ log.created_at.strftime('%m-%d %H:%M') }}</td>
+    </tr>{% endfor %}</tbody></table></div></div>
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+﻿{% extends "base.html" %}
+{% block title %}{% if user %}تعديل الموظف{% else %}موظف جديد{% endif %}{% endblock %}
+{% block page_title %}{% if user %}تعديل: {{ user.full_name }}{% else %}إضافة موظف جديد{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;margin:0 auto;">
+<div class="card">
+  <div class="card-header"><span class="card-title">👤 بيانات الموظف</span><a href="{{ url_for('admin.users') }}" class="btn btn-outline btn-sm">← عودة</a></div>
+  <div class="card-body">
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-row form-row-2">
+        <div class="form-group"><label class="form-label">الاسم الكامل <span class="required">*</span></label><input type="text" name="full_name" class="form-control" value="{{ user.full_name if user else '' }}" required></div>
+        <div class="form-group"><label class="form-label">اسم المستخدم <span class="required">*</span></label><input type="text" name="username" class="form-control" value="{{ user.username if user else '' }}" {% if user %}readonly{% endif %} required style="font-family:monospace;"></div>
+      </div>
+      <div class="form-row form-row-2">
+        <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input type="email" name="email" class="form-control" value="{{ user.email if user and user.email else '' }}"></div>
+        <div class="form-group"><label class="form-label">الدور والمستوى</label>
+          <select name="role" class="form-control">
+            <option value="employee" {% if user and user.role=='employee' %}selected{% endif %}>موظف</option>
+            <option value="supervisor" {% if user and user.role=='supervisor' %}selected{% endif %}>مشرف</option>
+            <option value="readonly" {% if user and user.role=='readonly' %}selected{% endif %}>قراءة فقط</option>
+            <option value="admin" {% if user and user.role=='admin' %}selected{% endif %}>مسؤول كامل</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">كلمة المرور {% if not user %}<span class="required">*</span>{% endif %}</label><input type="password" name="password" class="form-control" placeholder="{% if user %}اتركه فارغاً لعدم التغيير{% endif %}" {% if not user %}required{% endif %}></div>
+      
+      <h4 style="color:var(--primary);font-size:0.9rem;margin:20px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--primary-light);">🔑 الصلاحيات التفصيلية</h4>
+      <div class="form-row form-row-3">
+        <label class="form-check"><input type="checkbox" name="can_add" {% if not user or user.can_add %}checked{% endif %}><span>➕ إضافة اشتراكات</span></label>
+        <label class="form-check"><input type="checkbox" name="can_edit" {% if not user or user.can_edit %}checked{% endif %}><span>✏️ تعديل اشتراكات</span></label>
+        <label class="form-check"><input type="checkbox" name="can_delete" {% if user and user.can_delete %}checked{% endif %}><span>🗑 حذف اشتراكات</span></label>
+        <label class="form-check"><input type="checkbox" name="can_disconnect" {% if user and user.can_disconnect %}checked{% endif %}><span>🔌 قطع الجلسات</span></label>
+        <label class="form-check"><input type="checkbox" name="can_view_password" {% if user and user.can_view_password %}checked{% endif %}><span>🔐 رؤية كلمات المرور</span></label>
+        <label class="form-check"><input type="checkbox" name="can_view_finance" {% if user and user.can_view_finance %}checked{% endif %}><span>💰 التقارير المالية</span></label>
+      </div>
+      {% if user %}
+      <div style="margin-top:16px;">
+        <label class="form-check"><input type="checkbox" name="is_active" {% if user.is_active %}checked{% endif %}><span>✅ الحساب فعّال</span></label>
+      </div>
+      {% endif %}
+      <div class="form-group" style="margin-top:16px;"><label class="form-label">ملاحظات</label><textarea name="notes" class="form-control" rows="2">{{ user.notes if user else '' }}</textarea></div>
+      <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+        <a href="{{ url_for('admin.users') }}" class="btn btn-outline">إلغاء</a>
+        <button type="submit" class="btn btn-primary">{% if user %}💾 حفظ{% else %}✅ إضافة الموظف{% endif %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+</div>
+{% endblock %}

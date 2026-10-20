@@ -1,0 +1,120 @@
+<!-- Modal: Quick Renewal & Subscription -->
+<div class="modal-overlay" id="quick-renew-modal">
+  <div class="modal-box" style="max-width: 580px; width: 95%;">
+    <div class="modal-header" style="background: linear-gradient(135deg, #1e293b, #0f172a); color: #fff; padding: 16px 20px; border-radius: 12px 12px 0 0;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:1.4rem;">⚡</span>
+        <div>
+          <h3 class="modal-title" style="color:#fff; margin:0; font-size:1.15rem;">تجديد واشتراك برودباند PPPoE</h3>
+          <div style="font-size:0.78rem; color:#94a3b8;">تجديد فوري لمشترك سابق أو تسجيل مشترك جديد</div>
+        </div>
+      </div>
+      <button class="modal-close" data-close-modal style="color:#fff; font-size:1.4rem;">&times;</button>
+    </div>
+
+    <!-- Mode Tabs -->
+    <div style="display:flex; background:#f1f5f9; padding:6px; gap:6px; border-bottom:1px solid #e2e8f0;">
+      <button type="button" id="qr-tab-existing" class="btn btn-sm" style="flex:1; border-radius:8px; font-weight:700; background:#fff; color:#0f172a; box-shadow:0 1px 3px rgba(0,0,0,0.1);" onclick="setQuickRenewMode('existing')">
+        🔄 تجديد لمشترك سابق
+      </button>
+      <button type="button" id="qr-tab-new" class="btn btn-sm" style="flex:1; border-radius:8px; font-weight:700; background:transparent; color:#64748b;" onclick="setQuickRenewMode('new')">
+        ➕ اشتراك جديد
+      </button>
+    </div>
+
+    <form id="quick-renew-form" onsubmit="submitQuickRenew(event)" style="padding: 18px 20px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="mode" id="qr-mode" value="existing">
+      <input type="hidden" name="device_id" id="qr-device-id" value="{{ selected.id if selected else (devices[0].id if devices else 1) }}">
+
+      <!-- ================= EXISTING USER SECTION ================= -->
+      <div id="qr-existing-section" style="margin-bottom: 14px;">
+        <label class="form-label" style="font-weight:700; color:#0f172a; display:flex; justify-content:space-between;">
+          <span>👤 اختيار اسم المستخدم (اليوزر السابق):</span>
+          <span style="font-size:0.75rem; color:#2563eb; font-weight:normal;">اكتب للبحث السريع</span>
+        </label>
+        <select id="qr-existing-user-select" name="sub_id" class="searchable-select" data-placeholder="🔍 اضغط للبحث عن يوزر سابق...">
+          <option value="">-- اضغط للبحث واختيار المشترك --</option>
+        </select>
+        
+        <!-- Live info badge -->
+        <div id="qr-sub-info-badge" style="display:none; margin-top:8px; padding:8px 12px; background:#eff6ff; border-radius:8px; border:1px solid #bfdbfe; font-size:0.82rem; color:#1e40af; display:flex; justify-content:space-between; align-items:center;">
+        </div>
+      </div>
+
+      <!-- ================= NEW USER SECTION ================= -->
+      <div id="qr-new-section" style="display:none; margin-bottom: 14px;">
+        <div class="grid grid-2" style="gap:10px; margin-bottom:10px;">
+          <div>
+            <label class="form-label" style="font-weight:700;">اسم المستخدم (PPPoE Username) *</label>
+            <input type="text" name="username" id="qr-new-username" class="form-input" placeholder="مثلاً: user123">
+          </div>
+          <div>
+            <label class="form-label" style="font-weight:700;">كلمة المرور (Password) *</label>
+            <input type="text" name="password" id="qr-new-password" class="form-input" placeholder="كلمة المرور">
+          </div>
+        </div>
+        <div class="grid grid-2" style="gap:10px;">
+          <div>
+            <label class="form-label">اسم المشترك / العميل (اختياري)</label>
+            <input type="text" name="customer_name" id="qr-customer-name" class="form-input" placeholder="الاسم الكامل">
+          </div>
+          <div>
+            <label class="form-label">رقم الهاتف (اختياري)</label>
+            <input type="text" name="customer_phone" id="qr-customer-phone" class="form-input" placeholder="07xxxxxxxxx">
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= CATEGORY & PROFILE SELECTION ================= -->
+      <div class="grid grid-2" style="gap:12px; margin-bottom: 14px;">
+        <div>
+          <label class="form-label" style="font-weight:700; color:#0f172a;">🏷️ فئة الباقة:</label>
+          <select id="qr-category-select" class="searchable-select" data-placeholder="اختر فئة الباقة...">
+            <option value="all">-- كل الفئات --</option>
+            {% for cat in categories %}
+            <option value="{{ cat }}">{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label" style="font-weight:700; color:#0f172a;">📦 الباقة (البروفايل) *:</label>
+          <select id="qr-profile-id" name="profile_id" class="searchable-select" data-placeholder="اختر الباقة..." required>
+            <option value="">-- اختر الباقة --</option>
+            {% for p in profiles %}
+            <option value="{{ p.id }}" data-category="{{ p.category or 'عام' }}" data-price="{{ p.price or 0 }}" data-badge="{{ p.rate_limit or '' }}">
+              {{ p.name }} {% if p.rate_limit %}({{ p.rate_limit }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- ================= DURATION & PRICE ================= -->
+      <div class="grid grid-2" style="gap:12px; margin-bottom: 14px;">
+        <div>
+          <label class="form-label" style="font-weight:700;">⏱️ مدة التجديد (أشهر):</label>
+          <input type="number" name="months" id="qr-months" class="form-input" value="1" min="1" max="24" required>
+        </div>
+        <div>
+          <label class="form-label" style="font-weight:700;">💵 المبلغ المحصل (د.ع):</label>
+          <input type="number" name="price" id="qr-price" class="form-input" value="0" step="any" required>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div style="margin-bottom: 18px;">
+        <label class="form-label">📝 ملاحظات السند / التجديد (اختياري):</label>
+        <input type="text" name="comment" id="qr-comment" class="form-input" placeholder="ملاحظات تجديد...">
+      </div>
+
+      <!-- Submit Footer -->
+      <div style="display:flex; gap:10px; justify-content:flex-end; border-top:1px solid #f1f5f9; padding-top:14px;">
+        <button type="button" class="btn btn-outline" data-close-modal>إلغاء</button>
+        <button type="submit" id="qr-submit-btn" class="btn btn-primary" style="min-width:180px; font-weight:700;">
+          💾 تجديد وحفظ الاشتراك
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

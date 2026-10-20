@@ -1,0 +1,41 @@
+﻿{% extends "base.html" %}
+{% block title %}سجل العمليات{% endblock %}
+{% block page_title %}سجل التدقيق{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">📋 سجل جميع العمليات</span>
+    <form method="GET" style="display:flex;gap:8px;">
+      <div class="search-bar"><span class="search-icon">🔍</span><input type="text" name="q" placeholder="بحث..." value="{{ q or '' }}"></div>
+      <button type="submit" class="btn btn-primary btn-sm">بحث</button>
+    </form>
+  </div>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>الوقت</th><th>المستخدم</th><th>العملية</th><th>التفاصيل</th><th>IP</th></tr></thead>
+      <tbody>
+        {% for log in logs.items %}
+        <tr>
+          <td class="fs-sm text-muted">{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="mono fs-sm">{{ log.user.username if log.user else '—' }}</td>
+          <td><span class="badge" style="background:var(--primary-light);color:var(--primary);">{{ log.action }}</span></td>
+          <td class="fs-sm">{{ log.description[:80] if log.description else '—' }}</td>
+          <td class="mono fs-sm text-muted">{{ log.ip_address or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if logs.pages > 1 %}
+  <div style="padding:16px 24px;border-top:1px solid var(--border);">
+    <div class="pagination">
+      {% for p in logs.iter_pages(left_edge=1,right_edge=1,left_current=2,right_current=2) %}
+        {% if p %}<a href="{{ url_for('admin.audit_logs', page=p, q=q) }}" class="page-link {% if p==logs.page %}active{% endif %}">{{ p }}</a>
+        {% else %}<span class="page-link">…</span>{% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

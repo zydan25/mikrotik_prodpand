@@ -1,0 +1,57 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تسجيل الدخول — PPPoE Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body style="display:block;">
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">P</div>
+    <h1 class="auth-title">PPPoE Manager</h1>
+    <p class="auth-subtitle">نظام إدارة اشتراكات الإنترنت</p>
+
+    {% if error %}
+    <div style="background:rgba(224,49,49,0.15); border:1px solid rgba(224,49,49,0.3); color:#ff8787; padding:12px 16px; border-radius:8px; font-size:0.85rem; margin-bottom:20px;">
+      ⚠️ {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('auth.login') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
+
+      <div class="form-group">
+        <label class="form-label">اسم المستخدم</label>
+        <input type="text" name="username" class="form-control" placeholder="أدخل اسم المستخدم"
+               autocomplete="username" autofocus required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">كلمة المرور</label>
+        <input type="password" name="password" class="form-control" placeholder="••••••••"
+               autocomplete="current-password" required>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:24px;">
+        <input type="checkbox" name="remember" id="remember" style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary)">
+        <label for="remember" style="color:rgba(255,255,255,0.6);font-size:0.85rem;cursor:pointer;">تذكرني</label>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg btn-block">
+        <span class="btn-text">🔐 تسجيل الدخول</span>
+        <span class="spinner"><span class="spinner-border spinner-border-sm"></span> جاري...</span>
+      </button>
+    </form>
+
+    <p style="text-align:center; margin-top:24px; color:rgba(255,255,255,0.3); font-size:0.75rem;">
+      PPPoE Manager v1.0 • بوابة اشتراكات MikroTik
+    </p>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

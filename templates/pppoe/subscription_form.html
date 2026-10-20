@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}{% if sub %}تعديل الاشتراك{% else %}اشتراك جديد{% endif %}{% endblock %}
+{% block page_title %}{% if sub %}تعديل المشترك: {{ sub.username }}{% else %}إنشاء اشتراك PPPoE جديد{% endif %}{% endblock %}
+{% block breadcrumb %}الاشتراكات / {% if sub %}تعديل{% else %}جديد{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width:760px; margin:0 auto;">
+<div class="card">
+  <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+    <span class="card-title" style="font-weight:800;">{% if sub %}✏️ تعديل بيانات الاشتراك{% else %}➕ تسجيل اشتراك برودباند جديد{% endif %}</span>
+    <a href="{{ url_for('pppoe.subscriptions') }}" class="btn btn-outline btn-sm">&rarr; عودة للقائمة</a>
+  </div>
+  <div class="card-body" style="padding:24px;">
+    <form id="sub-form" action="{% if sub %}{{ url_for('pppoe.edit_subscription', sub_id=sub.id) }}{% else %}{{ url_for('pppoe.add_subscription') }}{% endif %}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <!-- قسم: بيانات الجهاز والباقة -->
+      <h4 style="color:#2563eb; font-size:0.95rem; font-weight:800; margin-bottom:16px; padding-bottom:8px; border-bottom:2px solid #dbeafe;">
+        🖥️ الراوتر والباقة
+      </h4>
+
+      <div class="form-row form-row-2">
+        <div class="form-group mb-3">
+          <label class="form-label" style="font-weight:700;">جهاز الراوتر *</label>
+          <select name="device_id" id="device-select-form" class="searchable-select" {% if sub %}disabled{% endif %} required>
+            {% for d in devices %}
+            <option value="{{ d.id }}" {% if (selected and d.id == selected.id) or (sub and d.id == sub.device_id) %}selected{% endif %}>
+              {{ d.name }} ({{ d.host }})
+            </option>
+            {% endfor %}
+          </select>
+          {% if sub %}<input type="hidden" name="device_id" value="{{ sub.device_id }}">{% endif %}
+        </div>
+
+        <div class="form-group mb-3">
+          <label class="form-label" style="font-weight:700;">الباقة (Profile) *</label>
+          <select name="profile_id" id="profile-select" class="searchable-select" required>
+            <option value="">-- اختر الباقة --</option>
+            {% for p in profiles %}
+            <option value="{{ p.id }}" data-rate="{{ p.rate_limit }}" data-price="{{ p.price|float }}"
+              {% if (sub and sub.profile_id == p.id) %}selected{% endif %}>
+              {{ p.name }} {% if p.rate_limit %}({{ p.rate_limit }}){% endif %}
+              {% if p.price > 0 %} — {{ "{:,.0f}".format(p.price) }} IQD{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- قسم: بيانات الحساب -->
+      <h4 style="color:#2563eb; font-size:0.95rem; font-weight:800; margin:24px 0 16px; padding-bottom:8px; border-bottom:2px solid #dbeafe;">
+        🔐 بيانات الاتصال (PPP Secret)
+      </h4>
+
+      <div class="form-row form-row-2">
+        <div class="form-group mb-3">
+          <label class="form-label" style="font-weight:700;">اسم المستخدم (Username) *</label>
+          <input type="text" name="username" class="form-input" placeholder="اسم المستخدم"
+                 value="{{ sub.username if sub else '' }}" {% if sub %}readonly{% endif %} required
+                 style="font-family:monospace; font-size:0.95rem; font-weight:700;">
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label" style="font-weight:700;">كلمة المرور (Password) {% if not sub %}*{% endif %}</label>
+          <div style="position:relative;">
+            <input type="text" name="password" id="password-field" class="form-input" 
+                   placeholder="{% if sub %}اتركه فارغاً لعدم التغيير{% else %}كلمة المرور{% endif %}"
+                   {% if not sub %}required{% endif %}
+                   style="font-family:monospace;">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row form-row-3">
+        <div class="form-group mb-3">
+          <label class="form-label">IP ثابت (اختياري)</label>
+          <input type="text" name="static_ip" class="form-input" placeholder="192.168.1.100"
+                 value="{{ sub.static_ip if sub else '' }}" style="font-family:monospace;">
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">قفل MAC (Caller-ID)</label>
+          <input type="text" name="caller_id" class="form-input" placeholder="AA:BB:CC:DD:EE:FF"
+                 value="{{ sub.caller_id if sub else '' }}" style="font-family:monospace;">
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">تاريخ الانتهاء</label>
+          <input type="date" name="expires_at" class="form-input"
+                 value="{{ sub.expires_at.strftime('%Y-%m-%d') if sub and sub.expires_at else '' }}">
+        </div>
+      </div>
+
+      <!-- قسم: بيانات العميل -->
+      <h4 style="color:#2563eb; font-size:0.95rem; font-weight:800; margin:24px 0 16px; padding-bottom:8px; border-bottom:2px solid #dbeafe;">
+        👤 بيانات المشترك (اختيارية)
+      </h4>
+
+      <div class="form-row form-row-2">
+        <div class="form-group mb-3">
+          <label class="form-label">اسم المشترك / العميل</label>
+          <input type="text" name="customer_name" class="form-input" placeholder="الاسم الكامل"
+                 value="{{ sub.customer_name if sub else '' }}">
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">رقم الهاتف</label>
+          <input type="tel" name="customer_phone" class="form-input" placeholder="07xxxxxxxxx"
+                 value="{{ sub.customer_phone if sub else '' }}" style="font-family:monospace;">
+        </div>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">العنوان والملاحظات</label>
+        <input type="text" name="customer_address" class="form-input" placeholder="العنوان أو الملاحظات"
+               value="{{ sub.customer_address if sub else '' }}">
+      </div>
+
+      <!-- قسم: المحاسبة -->
+      {% if not sub %}
+      <h4 style="color:#2563eb; font-size:0.95rem; font-weight:800; margin:24px 0 16px; padding-bottom:8px; border-bottom:2px solid #dbeafe;">
+        💰 التحصيل والدفع المالي
+      </h4>
+      <div class="form-row form-row-2">
+        <div class="form-group mb-3">
+          <label class="form-label" style="font-weight:700;">المبلغ المحصل (د.ع)</label>
+          <input type="number" name="price" id="price-field" class="form-input" placeholder="0"
+                 step="any" min="0" value="">
+          <div style="font-size:0.75rem; color:#64748b; margin-top:4px;">سيُسجَّل كدفعة في ذمة الموظف الحالي</div>
+        </div>
+        <div class="form-group mb-3">
+          <label class="form-label">ملاحظة السند</label>
+          <input type="text" name="comment" class="form-input" placeholder="ملاحظة الدفعة...">
+        </div>
+      </div>
+      {% endif %}
+
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:24px; padding-top:16px; border-top:1px solid #e2e8f0;">
+        <a href="{{ url_for('pppoe.subscriptions') }}" class="btn btn-outline">إلغاء</a>
+        <button type="submit" class="btn btn-primary" id="save-sub-btn" style="min-width:160px; font-weight:700;">
+          {% if sub %}💾 حفظ التعديلات{% else %}➕ حفظ وإنشاء الاشتراك{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// تحديث السعر تلقائياً عند اختيار باقة
+const profSel = document.getElementById('profile-select');
+if (profSel) {
+  profSel.addEventListener('change', () => {
+    const opt = profSel.options[profSel.selectedIndex];
+    const priceField = document.getElementById('price-field');
+    if (opt && opt.dataset.price && priceField && !priceField.value) {
+      priceField.value = opt.dataset.price;
+    }
+  });
+}
+
+// إرسال النموذج بنظام AJAX مع التأكيد والسبينر
+submitFormAjax('sub-form', (res) => {
+  setTimeout(() => {
+    window.location.href = "{{ url_for('pppoe.subscriptions') }}";
+  }, 1000);
+});
+</script>
+{% endblock %}

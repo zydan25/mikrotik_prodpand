@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() if csrf_token is defined else '' }}">
+  <title>{% block title %}PPPoE Manager{% endblock %} — بوابة الاشتراكات</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- Sidebar Overlay (Mobile) -->
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<!-- ======================== SIDEBAR ======================== -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">P</div>
+    <div>
+      <div class="brand-text">PPPoE Manager</div>
+      <div class="brand-sub">بوابة الاشتراكات السريعة</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">الرئيسية</div>
+    <div class="nav-item">
+      <a href="{{ url_for('pppoe.dashboard') }}" class="nav-link {% if (request.endpoint or '') == 'pppoe.dashboard' %}active{% endif %}">
+        <span class="nav-icon">📊</span> لوحة التحكم
+      </a>
+    </div>
+
+    <div class="nav-group-label">اشتراكات البرودباند</div>
+    <div class="nav-item">
+      <a href="{{ url_for('pppoe.subscriptions') }}" class="nav-link {% if 'subscriptions' in (request.endpoint or '') %}active{% endif %}">
+        <span class="nav-icon">👥</span> إدارة الاشتراكات
+      </a>
+    </div>
+    <div class="nav-item">
+      <a href="javascript:void(0)" onclick="openQuickRenewModal()" class="nav-link" style="color:#2563eb; font-weight:700;">
+        <span class="nav-icon">⚡</span> تجديد سريع
+      </a>
+    </div>
+    <div class="nav-item">
+      <a href="{{ url_for('pppoe.profiles') }}" class="nav-link {% if (request.endpoint or '') == 'pppoe.profiles' %}active{% endif %}">
+        <span class="nav-icon">📦</span> باقات وفئات الخدمة
+      </a>
+    </div>
+
+    {% if current_user.can_view_finance or current_user.is_admin or current_user.is_supervisor %}
+    <div class="nav-group-label">المالية وسندات الموظفين</div>
+    <div class="nav-item">
+      <a href="{{ url_for('accounting.employees') }}" class="nav-link {% if 'employee' in (request.endpoint or '') or 'settlement' in (request.endpoint or '') %}active{% endif %}">
+        <span class="nav-icon">🧾</span> سندات وحسابات الموظفين
+      </a>
+    </div>
+    <div class="nav-item">
+      <a href="{{ url_for('accounting.index') }}" class="nav-link {% if (request.endpoint or '') == 'accounting.index' %}active{% endif %}">
+        <span class="nav-icon">💰</span> الملخص المالي
+      </a>
+    </div>
+    <div class="nav-item">
+      <a href="{{ url_for('accounting.reports') }}" class="nav-link {% if (request.endpoint or '') == 'accounting.reports' %}active{% endif %}">
+        <span class="nav-icon">📈</span> تقارير المبيعات
+      </a>
+    </div>
+    {% endif %}
+
+    {% if current_user.is_admin or current_user.is_supervisor %}
+    <div class="nav-group-label">الإدارة والربط</div>
+    <div class="nav-item">
+      <a href="{{ url_for('admin.devices') }}" class="nav-link {% if 'device' in (request.endpoint or '') %}active{% endif %}">
+        <span class="nav-icon">🖥️</span> أجهزة MikroTik
+      </a>
+    </div>
+    {% if current_user.is_admin %}
+    <div class="nav-item">
+      <a href="{{ url_for('admin.users') }}" class="nav-link {% if 'user' in (request.endpoint or '') and 'admin' in (request.endpoint or '') %}active{% endif %}">
+        <span class="nav-icon">👤</span> الموظفون والصلاحيات
+      </a>
+    </div>
+    {% endif %}
+    <div class="nav-item">
+      <a href="{{ url_for('admin.audit_logs') }}" class="nav-link {% if (request.endpoint or '') == 'admin.audit_logs' %}active{% endif %}">
+        <span class="nav-icon">📋</span> سجل التدقيق والعمليات
+      </a>
+    </div>
+    {% endif %}
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="user-info">
+      <div class="user-avatar">{{ current_user.full_name[0] if current_user.full_name else 'م' }}</div>
+      <div>
+        <div class="user-name">{{ current_user.full_name }}</div>
+        <div class="user-role">
+          {% if current_user.is_admin %}مسؤول النظام
+          {% elif current_user.role == 'supervisor' %}مشرف
+          {% else %}موظف محصل{% endif %}
+        </div>
+      </div>
+    </div>
+    <a href="{{ url_for('auth.logout') }}" class="logout-btn">
+      <span>🚪</span> تسجيل الخروج
+    </a>
+  </div>
+</aside>
+
+<!-- ======================== MAIN CONTENT ======================== -->
+<div class="main-content">
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="القائمة الجانبية">☰</button>
+    <div>
+      <div class="topbar-title">{% block page_title %}الصفحة الرئيسية{% endblock %}</div>
+      <div class="topbar-breadcrumb">{% block breadcrumb %}{% endblock %}</div>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" class="btn btn-primary btn-sm" onclick="openQuickRenewModal()" style="display:inline-flex; align-items:center; gap:6px; font-weight:700;">
+        <span>⚡</span> تجديد سريع
+      </button>
+      {% block topbar_actions %}{% endblock %}
+    </div>
+  </header>
+
+  <!-- FLASH MESSAGES -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div style="padding: 12px 28px 0;">
+      {% for cat, msg in messages %}
+        <div class="flash-msg" style="padding:12px 16px; border-radius:8px; margin-bottom:8px; font-size:0.875rem; font-weight:500;
+          background:{% if cat=='success' %}#d3f9d8{% elif cat=='danger' %}#ffe3e3{% elif cat=='warning' %}#fff3bf{% else %}#e7f5ff{% endif %};
+          color:{% if cat=='success' %}#2f9e44{% elif cat=='danger' %}#e03131{% elif cat=='warning' %}#f59f00{% else %}#1971c2{% endif %};
+          border-right: 4px solid currentColor;">
+          {{ msg }}
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- PAGE CONTENT -->
+  <main class="page-content">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<!-- Global Quick Renew Modal -->
+{% include 'pppoe/quick_renew_modal.html' %}
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

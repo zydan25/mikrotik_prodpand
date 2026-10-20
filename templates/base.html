@@ -35,6 +35,14 @@
     </div>
 
     <div class="nav-group-label">اشتراكات البرودباند</div>
+    {% if current_user.is_admin or current_user.is_supervisor %}
+    <div class="nav-item">
+      <a href="{{ url_for('broadband_lab.index') }}" class="nav-link {% if (request.endpoint or '').startswith('broadband_lab.') %}active{% endif %}">
+        <span class="nav-icon">🧪</span> مختبر جلب البرودباند
+      </a>
+    </div>
+    {% endif %}
+
     <div class="nav-item">
       <a href="{{ url_for('pppoe.subscriptions') }}" class="nav-link {% if 'subscriptions' in (request.endpoint or '') %}active{% endif %}">
         <span class="nav-icon">👥</span> إدارة الاشتراكات

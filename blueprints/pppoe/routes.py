@@ -786,14 +786,19 @@ def api_sync_profiles(device_id):
             ))
             created += 1
 
-    safe_sample = dict(raw_rows[0]) if raw_rows else {}
-    for key in ('password', 'secret', 'token', 'api-key'):
-        safe_sample.pop(key, None)
+    safe_rows = []
+    for raw_row in raw_rows[:50]:
+        safe_row = dict(raw_row)
+        for key in ('password', 'secret', 'token', 'api-key'):
+            safe_row.pop(key, None)
+        safe_rows.append(safe_row)
+    safe_sample = safe_rows[0] if safe_rows else {}
     device.last_sync_raw = {
         'kind':'profiles','path':'/ppp/profile','ok':True,'synced_at':now.isoformat(),
-        'raw_count':len(raw_rows),'processed_count':created+updated,'created':created,'updated':updated,
+        'raw_count':len(raw_rows),'preview_count':len(safe_rows),
+        'processed_count':created+updated,'created':created,'updated':updated,
         'skipped_without_name':skipped_without_name,
-        'sample_json':json.dumps(safe_sample, ensure_ascii=False, indent=2, default=str)
+        'sample_json':json.dumps(safe_rows, ensure_ascii=False, indent=2, default=str)
     }
     db.session.commit()
     log_audit('sync_profiles', f'مزامنة باقات الراوتر: تم إضافة {created} وتحديث {updated}', 'device', device.id)
@@ -918,16 +923,20 @@ def api_sync_subscriptions(device_id):
             db.session.add(sub)
             created += 1
 
-    safe_sample = dict(result.data[0]) if result.data else {}
-    # Secret responses can contain passwords; keep credentials out of stored diagnostics.
-    for key in ('password', 'secret', 'token', 'api-key'):
-        safe_sample.pop(key, None)
+    # Keep a useful raw preview while excluding credentials from the API response and database diagnostics.
+    safe_rows = []
+    for raw_row in result.data[:50]:
+        safe_row = dict(raw_row)
+        for key in ('password', 'secret', 'token', 'api-key'):
+            safe_row.pop(key, None)
+        safe_rows.append(safe_row)
+    safe_sample = safe_rows[0] if safe_rows else {}
     device.last_sync_raw = {
         'kind':'subscriptions','path':'/ppp/secret','ok':True,
-        'total_secrets':len(result.data),'raw_count':len(result.data),
+        'total_secrets':len(result.data),'raw_count':len(result.data),'preview_count':len(safe_rows),
         'processed_count':created+updated,'created':created,'updated':updated,
         'synced_at':now.isoformat(),'sample':safe_sample,
-        'sample_json':json.dumps(safe_sample, ensure_ascii=False, indent=2, default=str)
+        'sample_json':json.dumps(safe_rows, ensure_ascii=False, indent=2, default=str)
     }
     db.session.commit()
     log_audit('sync_subs', f'مزامنة مشتركي الراوتر: استيراد {created} وتحديث {updated}', 'device', device.id)

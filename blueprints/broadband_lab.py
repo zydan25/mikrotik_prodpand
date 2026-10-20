@@ -14,14 +14,15 @@ SOURCES = {
     'um_profiles': {'label': 'باقات User Manager', 'path': '/user-manager/profile', 'legacy_path': '/tool/user-manager/profile', 'props': '.id,name,name-for-users,price,validity,starts-when,override-shared-users'},
     'um_limitations': {'label': 'قيود User Manager', 'path': '/user-manager/limitation', 'legacy_path': '/tool/user-manager/profile/limitation', 'props': '.id,name,transfer-limit,upload-limit,download-limit,uptime-limit,rate-limit'},
     'um_profile_limitations': {'label': 'ربط الباقات بالقيود', 'path': '/user-manager/profile-limitation', 'legacy_path': '/tool/user-manager/profile/profile-limitation', 'props': '.id,profile,limitation,from-time,till-time,weekdays'},
-    'um_user_profiles': {'label': 'اشتراكات مستخدمي User Manager', 'path': '/user-manager/user-profile', 'legacy_path': None, 'props': '.id,user,profile,state,end-time'},
+    'um_users': {'label': 'مستخدمو User Manager مباشرة', 'path': '/user-manager/user', 'legacy_paths': ['/tool/user-manager/user'], 'props': '.id,name,disabled,group,shared-users,caller-id,attributes,last-logged-in'},
+    'um_user_profiles': {'label': 'باقات المستخدمين المسندة (User Profiles)', 'path': '/user-manager/user-profile', 'legacy_paths': ['/tool/user-manager/user/profile', '/tool/user-manager/user-profile'], 'props': '.id,user,profile,state,end-time'},
 }
 
 def _read_source(service, source):
-    """يقرأ مصدر User Manager مع تجربة مسارات RouterOS v7 ثم مسارات User Manager القديم."""
+    """يقرأ مصدر User Manager مع تجربة المسارات الحديثة والقديمة عبر Binary API."""
     paths = [source['path']]
-    if not service._use_rest and source.get('legacy_path'):
-        paths.append(source['legacy_path'])
+    if not service._use_rest:
+        paths.extend(source.get('legacy_paths', []))
 
     last_error = None
     for path in paths:

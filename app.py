@@ -78,11 +78,13 @@ def create_app(config_name='default'):
     from blueprints.admin.routes import admin_bp
     from blueprints.pppoe.routes import pppoe_bp
     from blueprints.accounting.routes import accounting_bp
+    from blueprints.broadband_lab import lab_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(pppoe_bp)
     app.register_blueprint(accounting_bp)
+    app.register_blueprint(lab_bp)
 
     
     @app.errorhandler(400)

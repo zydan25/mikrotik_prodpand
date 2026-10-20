@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}مختبر جلب البرودباند{% endblock %}
+{% block extra_head %}
+<style>
+.lab-wrap{max-width:1200px;margin:auto}.lab-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:14px}.lab-card,.lab-panel{background:var(--card-bg,#fff);border:1px solid #e5e7eb;border-radius:14px;padding:16px;box-shadow:0 3px 12px #00000008}.lab-card h3{font-size:16px;margin:0 0 8px}.lab-card p{font-size:13px;color:#64748b;min-height:38px}.lab-btn{border:0;border-radius:9px;padding:9px 13px;background:#2563eb;color:#fff;cursor:pointer;font-family:inherit}.lab-btn:disabled{opacity:.55}.lab-select{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:9px;margin:8px 0 16px;font-family:inherit}.lab-status{padding:10px;border-radius:9px;margin:10px 0;background:#f1f5f9}.lab-status.ok{background:#dcfce7;color:#166534}.lab-status.err{background:#fee2e2;color:#991b1b}.lab-table{width:100%;border-collapse:collapse;font-size:13px}.lab-table th,.lab-table td{padding:9px;border-bottom:1px solid #e5e7eb;text-align:right}.lab-table-wrap{overflow:auto}pre{direction:ltr;text-align:left;white-space:pre-wrap;word-break:break-word;background:#0f172a;color:#e2e8f0;padding:14px;border-radius:10px;max-height:450px;overflow:auto}.muted{color:#64748b;font-size:13px}@media(max-width:600px){.lab-card{padding:13px}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>مختبر جلب باقات البرودباند</h1><p class="muted">صفحة مستقلة للاختبار فقط؛ لا تعدّل الاشتراكات أو الباقات المحفوظة.</p></div></div>
+<div class="lab-wrap">
+ <section class="lab-panel" style="margin-bottom:16px"><label for="device">جهاز MikroTik</label><select id="device" class="lab-select"><option value="">— اختر الجهاز —</option>{% for d in devices %}<option value="{{ d.id }}">{{ d.name }} — {{ d.host }}{% if d.ros_version %} ({{ d.ros_version }}){% endif %}</option>{% endfor %}</select>
+ <p class="muted">اختبر الاشتراكات والبروفايلات أولاً، ثم مصادر User Manager. إذا لم يكن User Manager مثبتاً أو كان المسار غير متاح، ستظهر رسالة الخطأ المسجلة من الراوتر.</p></section>
+ <div class="lab-grid">{% for key,s in sources.items() %}<article class="lab-card"><h3>{{ s.label }}</h3><p><code dir="ltr">{{ s.path }}</code></p><button class="lab-btn" type="button" onclick="fetchSource('{{ key }}',this)">اختبار الجلب</button></article>{% endfor %}</div>
+ <section class="lab-panel" style="margin-top:16px"><h2 id="result-title">نتيجة الاختبار</h2><div id="status" class="lab-status">اختر الجهاز ثم اختبر أحد المصادر أعلاه.</div><div id="summary" class="muted"></div><div class="lab-table-wrap" id="table-wrap"></div><details style="margin-top:12px"><summary>عرض JSON الخام</summary><pre id="raw">لا توجد نتائج بعد.</pre></details></section>
+ <section class="lab-panel" style="margin-top:16px"><h2>سجل اختبارات الجلب الأخيرة</h2>{% if logs %}<div class="lab-table-wrap"><table class="lab-table"><thead><tr><th>الوقت</th><th>الجهاز</th><th>العملية</th><th>النتيجة</th><th>التفاصيل</th></tr></thead><tbody>{% for log in logs %}<tr><td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '—' }}</td><td>{% for d in devices %}{% if d.id == log.device_id %}{{ d.name }}{% endif %}{% endfor %}</td><td>{{ log.action }}</td><td>{{ 'نجاح' if log.ok else 'فشل' }}</td><td>{{ log.message }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="muted">لا توجد سجلات بعد. ستظهر هنا محاولات الجلب ونتائجها.</p>{% endif %}</section>
+</div>
+<script>
+const csrf=document.querySelector('meta[name="csrf-token"]')?.content||'';
+async function fetchSource(key,button){
+ const device=document.getElementById('device').value;
+ if(!device){alert('اختر جهاز MikroTik أولاً');return}
+ document.querySelectorAll('.lab-btn').forEach(b=>b.disabled=true);
+ const status=document.getElementById('status');status.className='lab-status';status.textContent='جارٍ الاتصال وجلب البيانات...';
+ document.getElementById('table-wrap').innerHTML='';document.getElementById('summary').textContent='';
+ try{
+  const res=await fetch('{{ url_for("broadband_lab.fetch_source") }}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf},body:JSON.stringify({device_id:device,source:key})});
+  const data=await res.json();status.className='lab-status '+(data.ok?'ok':'err');status.textContent=data.message||'انتهى الاختبار';
+  document.getElementById('result-title').textContent=data.label||'نتيجة الاختبار';
+  document.getElementById('summary').textContent='المسار: '+(data.path||'—')+' | السجلات: '+(data.count??0)+' | الجهاز: '+(data.device||'—')+(data.truncated?' | عُرض أول 500 سجل فقط':'');
+  document.getElementById('raw').textContent=JSON.stringify(data.data||data,null,2);
+  if(data.ok&&Array.isArray(data.data)&&data.data.length){
+   const cols=[...new Set(data.data.flatMap(row=>Object.keys(row)))].slice(0,12);
+   const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+   document.getElementById('table-wrap').innerHTML='<table class="lab-table"><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+data.data.slice(0,100).map(row=>'<tr>'+cols.map(c=>'<td>'+esc(typeof row[c]==='object'?JSON.stringify(row[c]):row[c])+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+  }else if(data.ok){document.getElementById('table-wrap').textContent='المصدر متاح لكنه لم يُرجع سجلات.'}
+ }catch(e){status.className='lab-status err';status.textContent='تعذر تنفيذ الطلب: '+e.message;document.getElementById('raw').textContent=String(e)}
+ finally{document.querySelectorAll('.lab-btn').forEach(b=>b.disabled=false)}
+}
+</script>
+{% endblock %}

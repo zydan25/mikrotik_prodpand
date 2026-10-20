@@ -54,7 +54,23 @@ def create_app(config_name='default'):
 
     @app.context_processor
     def inject_globals():
-        return {'app_name': 'PPPoE Manager', 'now': datetime.utcnow()}
+        from models import MikroTikDevice, PPPoEProfile
+        try:
+            devs = MikroTikDevice.query.filter_by(is_active=True).all()
+            profs = PPPoEProfile.query.filter_by(is_active=True).order_by(PPPoEProfile.category, PPPoEProfile.name).all()
+            cats = sorted(list({p.category or 'عام' for p in profs})) if profs else ['عام']
+        except Exception:
+            devs, profs, cats = [], [], ['عام']
+        return {
+            'app_name': 'PPPoE Manager',
+            'now': datetime.utcnow(),
+            'devices': devs,
+            'profiles': profs,
+            'categories': cats,
+            'global_devices': devs,
+            'global_profiles': profs,
+            'global_categories': cats
+        }
 
     with app.app_context():
         db.create_all()

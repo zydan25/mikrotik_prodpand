@@ -1,140 +1,453 @@
-{% extends "base.html" %}
-{% block title %}سندات وأرصدة الموظفين{% endblock %}
-{% block page_title %}سندات وحسابات الموظفين (التحصيل والتسويات){% endblock %}
+{% extends 'base.html' %}
+{% block title %}سندات وحسابات الموظفين - {{ app_name }}{% endblock %}
 
-{% block breadcrumb %}المالية / حسابات الموظفين{% endblock %}
+{% block breadcrumb %}المالية / حسابات وسندات الموظفين{% endblock %}
 
 {% block topbar_actions %}
 <div style="display:flex; gap:8px;">
-  <a href="{{ url_for('accounting.index') }}" class="btn btn-outline btn-sm">
-    💰 الملخص المالي العام
+  <a href="{{ url_for('accounting.index') }}" class="btn btn-outline btn-sm" style="font-weight:700;">
+    📊 لوحة المالية العامة
   </a>
 </div>
 {% endblock %}
 
 {% block content %}
-<!-- Top Summary Banner -->
-<div class="card mb-4" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #fff; padding:22px; border-radius:16px;">
+<style>
+  /* Employee Settlements Styles */
+  .emp-stat-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px 20px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .emp-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+  }
+  .emp-stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+  .emp-stat-val {
+    font-size: 1.45rem;
+    font-weight: 800;
+    line-height: 1.2;
+    font-family: inherit;
+  }
+  .emp-stat-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-top: 2px;
+    font-weight: 600;
+  }
+
+  /* Employee Cards */
+  .emp-card {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.25s ease;
+  }
+  .emp-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.07);
+  }
+  .emp-card.has-balance {
+    border-top: 4px solid #ef4444;
+  }
+  .emp-card.cleared {
+    border-top: 4px solid #10b981;
+  }
+  .emp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+  .emp-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #f1f5f9;
+    color: #1e293b;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    border: 1px solid #cbd5e1;
+  }
+  .emp-name {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.3;
+  }
+  .emp-role {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-top: 2px;
+  }
+
+  .emp-balance-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .emp-balance-amount {
+    font-size: 1.55rem;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+  }
+  .emp-balance-amount.danger {
+    color: #dc2626;
+  }
+  .emp-balance-amount.success {
+    color: #059669;
+  }
+
+  .emp-progress-bar-bg {
+    width: 100%;
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 8px 0;
+  }
+  .emp-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #059669);
+    border-radius: 6px;
+    transition: width 0.4s ease;
+  }
+
+  .emp-actions-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .emp-actions-row .btn {
+    flex: 1;
+    font-size: 0.82rem;
+    padding: 8px 10px;
+    font-weight: 700;
+    white-space: nowrap;
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* Table & Responsive */
+  .settlement-card-mobile {
+    display: none;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+  }
+  @media (max-width: 768px) {
+    .table-wrapper.desktop-only {
+      display: none;
+    }
+    .settlement-card-mobile {
+      display: block;
+    }
+  }
+</style>
+
+<!-- Top Overview Banner -->
+<div class="card mb-4" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #fff; padding:22px 24px; border-radius:18px; box-shadow:0 8px 24px rgba(15,23,42,0.15);">
   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
     <div>
-      <h2 style="font-size:1.35rem; margin:0 0 6px 0; color:#fff; font-weight:800;">
-        🧾 متابعة عهد وسندات الموظفين
-      </h2>
-      <p style="margin:0; font-size:0.88rem; color:#94a3b8;">
-        مراقبة المبالغ المحصلة في ذمم موظفي التحصيل، تسجيل سندات القبض، وتصفير الأرصدة
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+        <span style="font-size:1.6rem;">🧾</span>
+        <h2 style="font-size:1.35rem; margin:0; color:#fff; font-weight:800;">
+          إدارة عهد وسندات الموظفين
+        </h2>
+      </div>
+      <p style="margin:0; font-size:0.88rem; color:#94a3b8; line-height:1.5;">
+        متابعة الذمم المالية لموظفي التحصيل، تسجيل سندات القبض والتسليم، وتصفير الأرصدة مع إمكانية الطباعة الفورية
       </p>
+    </div>
+    <div>
+      <span class="badge" style="background:rgba(255,255,255,0.15); color:#fff; font-size:0.85rem; padding:6px 12px; border-radius:20px;">
+        👥 {{ stats.total_employees if stats else employees_data|length }} موظف مسجل
+      </span>
     </div>
   </div>
 </div>
 
-<!-- Employees Grid -->
-<h3 style="font-size:1.1rem; font-weight:800; color:#0f172a; margin-bottom:14px;">👥 كشوفات حساب الموظفين</h3>
-<div class="grid grid-3 mb-4" style="gap:16px;">
-  {% for d in employees_data %}
-  <div class="emp-card {% if d.balance > 0 %}has-balance{% else %}cleared{% endif %}">
-    <div class="emp-header">
-      <div>
-        <div class="emp-name">{{ d.user.full_name }}</div>
-        <div class="emp-role">@{{ d.user.username }} • {% if d.user.is_admin %}مدير{% elif d.user.role == 'supervisor' %}مشرف{% else %}موظف تحصيل{% endif %}</div>
+<!-- Financial Summary Stat Cards -->
+<div class="grid grid-4 mb-4" style="gap:14px;">
+  <!-- Total Pending in Custody -->
+  <div class="emp-stat-card">
+    <div class="emp-stat-icon" style="background:#fee2e2; color:#ef4444;">
+      ⏳
+    </div>
+    <div>
+      <div class="emp-stat-val" style="color:#ef4444;">
+        {{ "{:,.0f}".format(stats.total_balance if stats else 0) }}
+        <small style="font-size:0.75rem; font-weight:normal; color:#64748b;">د.ع</small>
       </div>
-      <div>
-        {% if d.balance > 0 %}
-          <span class="badge badge-danger">في ذمته مبالغ</span>
-        {% else %}
-          <span class="badge badge-success">حساب مصفّى</span>
-        {% endif %}
+      <div class="emp-stat-label">المتبقي بذمم الموظفين</div>
+    </div>
+  </div>
+
+  <!-- Total Collected -->
+  <div class="emp-stat-card">
+    <div class="emp-stat-icon" style="background:#dbeafe; color:#2563eb;">
+      📥
+    </div>
+    <div>
+      <div class="emp-stat-val" style="color:#2563eb;">
+        {{ "{:,.0f}".format(stats.total_collected if stats else 0) }}
+        <small style="font-size:0.75rem; font-weight:normal; color:#64748b;">د.ع</small>
       </div>
+      <div class="emp-stat-label">إجمالي التحصيلات</div>
+    </div>
+  </div>
+
+  <!-- Total Settled to Admin -->
+  <div class="emp-stat-card">
+    <div class="emp-stat-icon" style="background:#dcfce7; color:#10b981;">
+      💵
+    </div>
+    <div>
+      <div class="emp-stat-val" style="color:#10b981;">
+        {{ "{:,.0f}".format(stats.total_settled if stats else 0) }}
+        <small style="font-size:0.75rem; font-weight:normal; color:#64748b;">د.ع</small>
+      </div>
+      <div class="emp-stat-label">تم تسليمه للصندوق</div>
+    </div>
+  </div>
+
+  <!-- Total Vouchers Count -->
+  <div class="emp-stat-card">
+    <div class="emp-stat-icon" style="background:#fef3c7; color:#d97706;">
+      📜
+    </div>
+    <div>
+      <div class="emp-stat-val" style="color:#d97706;">
+        {{ stats.total_settlements_count if stats else recent_settlements|length }}
+        <small style="font-size:0.75rem; font-weight:normal; color:#64748b;">سند</small>
+      </div>
+      <div class="emp-stat-label">سندات القبض المسجلة</div>
+    </div>
+  </div>
+</div>
+
+<!-- Employees Section with Filter & Search -->
+<div class="card mb-4" style="padding:16px 20px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+    <div>
+      <h3 style="font-size:1.15rem; font-weight:800; color:#0f172a; margin:0 0 4px 0;">
+        👥 أرصدة وحسابات موظفي التحصيل
+      </h3>
+      <div style="font-size:0.8rem; color:#64748b;">انقر على أي موظف لتسجيل سند قبض أو تصفير حسابه</div>
     </div>
 
-    <!-- Balance Box -->
-    <div class="emp-balance-box">
-      <div>
-        <div style="font-size:0.8rem; color:#64748b; margin-bottom:2px;">المتبقي في ذمته حالياً:</div>
-        <div class="emp-balance-amount {% if d.balance > 0 %}danger{% else %}success{% endif %}">
-          {{ "{:,.0f}".format(d.balance) }} <small style="font-size:0.9rem; font-weight:normal;">د.ع</small>
+    <!-- Search & Filter Controls -->
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <input type="text" id="emp-search-input" class="form-input" placeholder="🔍 بحث عن موظف..." style="width:200px; padding:6px 12px; font-size:0.85rem;" oninput="filterEmployeeCards()">
+      <div style="display:flex; gap:4px; background:#f1f5f9; padding:3px; border-radius:8px;">
+        <button type="button" class="btn btn-sm emp-filter-btn active" data-filter="all" onclick="setEmpFilter('all')" style="font-size:0.78rem; padding:4px 10px; border-radius:6px; background:#fff; font-weight:700;">الكل</button>
+        <button type="button" class="btn btn-sm emp-filter-btn" data-filter="balance" onclick="setEmpFilter('balance')" style="font-size:0.78rem; padding:4px 10px; border-radius:6px; background:transparent; color:#64748b; font-weight:700;">بذمتهم مبالغ</button>
+        <button type="button" class="btn btn-sm emp-filter-btn" data-filter="cleared" onclick="setEmpFilter('cleared')" style="font-size:0.78rem; padding:4px 10px; border-radius:6px; background:transparent; color:#64748b; font-weight:700;">مصفى</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Employees Grid Cards -->
+<div class="grid grid-3 mb-4" id="employees-grid" style="gap:16px;">
+  {% for d in employees_data %}
+  <div class="emp-card {% if d.balance > 0 %}has-balance{% else %}cleared{% endif %}" 
+       data-name="{{ d.user.full_name|lower }}" 
+       data-username="{{ d.user.username|lower }}" 
+       data-has-balance="{% if d.balance > 0 %}true{% else %}false{% endif %}">
+    
+    <div>
+      <div class="emp-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="emp-avatar">
+            {{ d.user.full_name[:1] if d.user.full_name else 'U' }}
+          </div>
+          <div>
+            <div class="emp-name">{{ d.user.full_name }}</div>
+            <div class="emp-role">
+              @{{ d.user.username }} • 
+              {% if d.user.is_admin %}
+                <span style="color:#2563eb; font-weight:700;">مدير عام</span>
+              {% elif d.user.role == 'supervisor' %}
+                <span style="color:#8b5cf6; font-weight:700;">مشرف</span>
+              {% else %}
+                <span>موظف تحصيل</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          {% if d.balance > 0 %}
+            <span class="badge badge-danger" style="font-size:0.75rem;">بذمته مبلغ</span>
+          {% else %}
+            <span class="badge badge-success" style="font-size:0.75rem;">حساب مصفّى</span>
+          {% endif %}
         </div>
       </div>
-      <div style="text-align:left; font-size:0.8rem; color:#64748b;">
-        <div>تم تحصيله: <strong>{{ "{:,.0f}".format(d.collected) }}</strong></div>
-        <div>تم تسليمه: <strong>{{ "{:,.0f}".format(d.settled) }}</strong></div>
+
+      <!-- Balance Box -->
+      <div class="emp-balance-box">
+        <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:4px;">
+          <div>
+            <div style="font-size:0.78rem; color:#64748b; font-weight:600;">المتبقي في ذمته حالياً:</div>
+            <div class="emp-balance-amount {% if d.balance > 0 %}danger{% else %}success{% endif %}">
+              {{ "{:,.0f}".format(d.balance) }}
+              <small style="font-size:0.82rem; font-weight:normal; color:#64748b;">د.ع</small>
+            </div>
+          </div>
+          <div style="text-align:left; font-size:0.8rem; color:#64748b;">
+            <span style="font-weight:700; color:#0f172a;">{{ d.settled_percent }}%</span> مسلّم
+          </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="emp-progress-bar-bg">
+          <div class="emp-progress-bar-fill" style="width: {{ d.settled_percent }}%;"></div>
+        </div>
+
+        <!-- Details Row -->
+        <div style="display:flex; justify-content:space-between; font-size:0.78rem; color:#64748b; margin-top:8px; border-top:1px dashed #e2e8f0; padding-top:6px;">
+          <div>تم تحصيله: <strong style="color:#0f172a;">{{ "{:,.0f}".format(d.collected) }}</strong></div>
+          <div>تم تسليمه: <strong style="color:#10b981;">{{ "{:,.0f}".format(d.settled) }}</strong></div>
+        </div>
+      </div>
+
+      <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:12px; display:flex; justify-content:space-between;">
+        <span>📝 العمليات: <strong>{{ d.payments_count }}</strong></span>
+        <span>
+          {% if d.last_settlement %}
+            آخر تسوية: {{ d.last_settlement.settled_at.strftime('%Y-%m-%d') }}
+          {% else %}
+            لا توجد تسويات سابقة
+          {% endif %}
+        </span>
       </div>
     </div>
 
     <!-- Actions Row -->
     <div class="emp-actions-row">
-      <button class="btn btn-primary" onclick="openSettlementModal({{ d.user.id }}, '{{ d.user.full_name }}', {{ d.balance }})">
-        💵 إضافة سند تسوية
+      <button type="button" class="btn btn-primary" onclick="openSettlementModal({{ d.user.id }}, '{{ d.user.full_name }}', {{ d.balance }})">
+        💵 إضافة سند قبض
       </button>
 
       {% if current_user.is_admin and d.balance > 0 %}
-      <button class="btn btn-outline" style="color:#ef4444; border-color:#ef4444;" onclick="confirmZeroBalance({{ d.user.id }}, '{{ d.user.full_name }}', {{ d.balance }})">
+      <button type="button" class="btn btn-outline" style="color:#ef4444; border-color:#fca5a5; background:#fff;" onclick="confirmZeroBalance({{ d.user.id }}, '{{ d.user.full_name }}', {{ d.balance }})" title="تصفير كامل الذمة وإنشاء سند تصفير">
         🎯 تصفير
       </button>
       {% endif %}
 
-      <a href="{{ url_for('accounting.employee_report', user_id=d.user.id) }}" class="btn btn-outline">
-        📊 التقرير الشهري
+      <a href="{{ url_for('accounting.employee_report', user_id=d.user.id) }}" class="btn btn-outline" style="color:#475569;">
+        📊 التقرير
       </a>
     </div>
+
   </div>
   {% endfor %}
 </div>
 
-<!-- ================= RECENT SETTLEMENTS TABLE ================= -->
+<!-- ================= RECENT SETTLEMENTS SECTION ================= -->
 <div class="card">
-  <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+  <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
     <div>
-      <h3 class="card-title">آخر سندات القبض والتسويات المسجلة</h3>
-      <div style="font-size:0.8rem; color:var(--text-secondary);">سجل المبالغ المستلمة من الموظفين</div>
+      <h3 class="card-title" style="margin:0 0 2px 0;">📜 سجل آخر سندات القبض والتسويات</h3>
+      <div style="font-size:0.8rem; color:var(--text-secondary);">كشف المبالغ المستلمة من المحصلين مع إمكانية طباعة السند</div>
+    </div>
+    <div style="font-size:0.82rem; color:#64748b;">
+      عرض آخر <strong>{{ recent_settlements|length }}</strong> سند
     </div>
   </div>
 
-  <div class="table-wrapper">
+  <!-- Desktop Table View -->
+  <div class="table-wrapper desktop-only">
     <table>
       <thead>
         <tr>
           <th>رقم السند</th>
-          <th>الموظف</th>
+          <th>الموظف / المحصل</th>
           <th>المبلغ المسلم</th>
           <th>نوع السند</th>
-          <th>التاريخ والوقت</th>
-          <th>المستلم (المدير)</th>
+          <th>تاريخ ووقت السند</th>
+          <th>المدير المستلم</th>
           <th>ملاحظات</th>
-          <th>طباعة</th>
+          <th style="text-align:center;">إجراءات</th>
         </tr>
       </thead>
       <tbody>
         {% for s in recent_settlements %}
         <tr>
           <td>
-            <strong style="color:#0f172a; font-family:monospace;">{{ s.receipt_number or '—' }}</strong>
+            <div style="font-weight:800; color:#0f172a; font-family:monospace; font-size:0.9rem;">
+              {{ s.receipt_number or '—' }}
+            </div>
           </td>
           <td>
-            <div style="font-weight:700;">{{ s.user.full_name }}</div>
+            <div style="font-weight:700; color:#0f172a;">{{ s.user.full_name }}</div>
             <small style="color:#64748b;">@{{ s.user.username }}</small>
           </td>
-          <td style="font-weight:800; color:#059669; font-size:1rem;">
-            {{ "{:,.0f}".format(s.amount) }} {{ s.currency }}
+          <td>
+            <div style="font-weight:800; color:#059669; font-size:1.05rem;">
+              {{ "{:,.0f}".format(s.amount) }} <small style="font-size:0.8rem; font-weight:normal;">{{ s.currency }}</small>
+            </div>
           </td>
           <td>
             {% if s.settlement_type == 'zeroing' %}
-              <span class="badge badge-danger">تصفير شامل</span>
+              <span class="badge badge-danger">🎯 تصفير شامل</span>
+            {% elif s.settlement_type == 'transfer' %}
+              <span class="badge" style="background:#e0e7ff; color:#4338ca;">💳 حوالة بنكية</span>
             {% else %}
-              <span class="badge badge-success">سند قبض تسوية</span>
+              <span class="badge badge-success">💵 سند قبض نقدي</span>
             {% endif %}
           </td>
-          <td>{{ s.settled_at.strftime('%Y-%m-%d %H:%M') }}</td>
-          <td>{{ s.settled_by.full_name if s.settled_by else 'النظام' }}</td>
-          <td>{{ s.notes or '—' }}</td>
+          <td style="color:#475569; font-size:0.85rem;">
+            {{ s.settled_at.strftime('%Y-%m-%d %H:%M') }}
+          </td>
           <td>
-            <a href="{{ url_for('accounting.print_settlement', settlement_id=s.id) }}" target="_blank" class="btn btn-sm btn-outline">
+            <span style="font-weight:600; color:#334155;">{{ s.settled_by.full_name if s.settled_by else 'مدير النظام' }}</span>
+          </td>
+          <td style="color:#64748b; font-size:0.85rem; max-width:200px;">
+            {{ s.notes or '—' }}
+          </td>
+          <td style="text-align:center;">
+            <a href="{{ url_for('accounting.print_settlement', settlement_id=s.id) }}" target="_blank" class="btn btn-sm btn-outline" style="font-weight:700; display:inline-flex; align-items:center; gap:4px;">
               🖨️ طباعة
             </a>
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="8" style="text-align:center; padding:30px; color:#64748b;">
+          <td colspan="8" style="text-align:center; padding:35px; color:#64748b;">
             لا توجد سندات تسوية مسجلة حتى الآن
           </td>
         </tr>
@@ -142,47 +455,264 @@
       </tbody>
     </table>
   </div>
+
+  <!-- Mobile Cards View -->
+  <div style="padding:12px 14px;">
+    {% for s in recent_settlements %}
+    <div class="settlement-card-mobile">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+        <div>
+          <span style="font-weight:800; font-family:monospace; font-size:0.85rem; color:#2563eb;">{{ s.receipt_number or '—' }}</span>
+          <div style="font-weight:700; color:#0f172a; font-size:0.95rem; margin-top:2px;">{{ s.user.full_name }}</div>
+        </div>
+        <div style="text-align:left;">
+          <div style="font-weight:800; color:#059669; font-size:1.1rem;">
+            {{ "{:,.0f}".format(s.amount) }} <small style="font-size:0.75rem;">{{ s.currency }}</small>
+          </div>
+          {% if s.settlement_type == 'zeroing' %}
+            <span class="badge badge-danger" style="font-size:0.7rem;">تصفير</span>
+          {% else %}
+            <span class="badge badge-success" style="font-size:0.7rem;">سند قبض</span>
+          {% endif %}
+        </div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.78rem; color:#64748b; border-top:1px dashed #e2e8f0; padding-top:8px;">
+        <span>📅 {{ s.settled_at.strftime('%Y-%m-%d %H:%M') }}</span>
+        <a href="{{ url_for('accounting.print_settlement', settlement_id=s.id) }}" target="_blank" class="btn btn-sm btn-outline" style="padding:3px 8px; font-size:0.75rem;">
+          🖨️ طباعة
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
 </div>
 
 <!-- ================= MODAL: ADD SETTLEMENT ================= -->
 <div class="modal-overlay" id="settlement-modal">
-  <div class="modal-box" style="max-width:480px;">
-    <div class="modal-header">
-      <h3 class="modal-title">💵 تسجيل سند قبض / تسوية موظف</h3>
-      <button class="modal-close" data-close-modal>&times;</button>
-    </div>
-    <form id="settlement-form" onsubmit="submitSettlement(event)">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div class="modal-body">
-        <input type="hidden" name="user_id" id="settlement-user-id">
-
-        <div style="padding:12px; background:#eff6ff; border-radius:8px; border:1px solid #bfdbfe; margin-bottom:14px;">
-          <div style="font-size:0.85rem; color:#1e40af;">الموظف: <strong id="settlement-user-name"></strong></div>
-          <div style="font-size:0.85rem; color:#1e40af; margin-top:4px;">الرصيد المتبقي في ذمته: <strong id="settlement-curr-balance" style="color:#ef4444; font-size:1rem;"></strong></div>
-        </div>
-
-        <div class="form-group mb-3">
-          <label class="form-label">المبلغ المسلم (د.ع) *</label>
-          <input type="number" name="amount" id="settlement-amount" class="form-input" required step="any" placeholder="المبلغ">
-        </div>
-
-        <div class="form-group mb-3">
-          <label class="form-label">رقم الإيصال / السند (اختياري)</label>
-          <input type="text" name="receipt_number" class="form-input" placeholder="سيتم إنشاؤه تلقائياً إن ترك فارغاً">
-        </div>
-
-        <div class="form-group mb-3">
-          <label class="form-label">ملاحظات السند (اختياري)</label>
-          <textarea name="notes" class="form-input" rows="2" placeholder="مثلاً: دفعة تحصيل أسبوعية..."></textarea>
+  <div class="modal-box" style="max-width:520px; width:95%; border-radius:16px; overflow:hidden;">
+    <div class="modal-header" style="background: linear-gradient(135deg, #0f172a, #1e293b); color: #fff; padding:16px 20px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:1.3rem;">💵</span>
+        <div>
+          <h3 class="modal-title" style="color:#fff; margin:0; font-size:1.15rem;">تسجيل سند قبض / تسوية موظف</h3>
+          <div style="font-size:0.78rem; color:#94a3b8;">إدخال المبالغ المسلمة لعهدة الموظف وتحديث رصيده</div>
         </div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline" data-close-modal>إلغاء</button>
-        <button type="submit" id="settlement-submit-btn" class="btn btn-primary" style="font-weight:700;">
-          💾 حفظ وطباعة السند
-        </button>
+      <button class="modal-close" data-close-modal style="color:#fff;">&times;</button>
+    </div>
+
+    <form id="settlement-form" onsubmit="submitSettlement(event)" style="padding:20px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="user_id" id="settlement-user-id">
+
+      <!-- Employee Info Banner in Modal -->
+      <div style="padding:14px 16px; background:#eff6ff; border-radius:12px; border:1px solid #bfdbfe; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:0.85rem; color:#1e40af;">الموظف: <strong id="settlement-user-name" style="font-size:0.95rem; color:#0f172a;"></strong></span>
+          <span class="badge badge-info" style="font-size:0.72rem;">تسجيل إيصال</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.82rem; color:#64748b;">الرصيد المتبقي في ذمته حالياً:</span>
+          <span id="settlement-curr-balance" style="color:#dc2626; font-size:1.15rem; font-weight:800;"></span>
+        </div>
+      </div>
+
+      <!-- Amount Input with Quick Fill Buttons -->
+      <div class="form-group mb-3">
+        <label class="form-label" style="font-weight:700; color:#0f172a; display:flex; justify-content:space-between;">
+          <span>المبلغ المسلم (د.ع) *</span>
+          <span id="settlement-new-balance-preview" style="font-size:0.78rem; color:#059669; font-weight:normal;"></span>
+        </label>
+        <input type="number" name="amount" id="settlement-amount" class="form-input" required step="any" placeholder="المبلغ المسلم" oninput="calculateBalancePreview()" style="font-size:1.1rem; font-weight:700;">
+        <div style="display:flex; gap:6px; margin-top:6px;">
+          <button type="button" class="btn btn-sm btn-outline" style="font-size:0.75rem; padding:3px 8px;" onclick="fillSettlementAmount('full')">كامل المبلغ المتبقي</button>
+          <button type="button" class="btn btn-sm btn-outline" style="font-size:0.75rem; padding:3px 8px;" onclick="fillSettlementAmount('half')">نصف المبلغ</button>
+        </div>
+      </div>
+
+      <!-- Settlement Type -->
+      <div class="form-group mb-3">
+        <label class="form-label" style="font-weight:700;">نوع وطريقة التسليم *</label>
+        <select name="settlement_type" class="form-input">
+          <option value="receipt">💵 سند قبض نقدي (تسليم يدوي)</option>
+          <option value="transfer">💳 حوالة مصرفية / دفع إلكتروني</option>
+          <option value="other">📝 أخرى</option>
+        </select>
+      </div>
+
+      <!-- Receipt Number & Notes -->
+      <div class="grid grid-2" style="gap:10px; margin-bottom:12px;">
+        <div>
+          <label class="form-label">رقم السند (اختياري)</label>
+          <input type="text" name="receipt_number" class="form-input" placeholder="تلقائي إن ترك فارغاً">
+        </div>
+        <div>
+          <label class="form-label">العملة</label>
+          <input type="text" name="currency" class="form-input" value="IQD" readonly style="background:#f8fafc;">
+        </div>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label">ملاحظات السند (اختياري)</label>
+        <textarea name="notes" class="form-input" rows="2" placeholder="مثلاً: دفعة تحصيل أسبوعية، تصفية حسابات..."></textarea>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:14px; margin-top:10px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:0.82rem; cursor:pointer; color:#475569;">
+          <input type="checkbox" id="settlement-auto-print" checked>
+          <span>فتح السند للطباعة فور الحفظ</span>
+        </label>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn btn-outline" data-close-modal>إلغاء</button>
+          <button type="submit" id="settlement-submit-btn" class="btn btn-primary" style="font-weight:700; min-width:140px;">
+            💾 حفظ السند
+          </button>
+        </div>
       </div>
     </form>
   </div>
 </div>
+
+<script>
+  let modalCurrentBalance = 0;
+
+  function openSettlementModal(userId, userName, currentBalance) {
+    const modal = document.getElementById('settlement-modal');
+    if (!modal) return;
+
+    modalCurrentBalance = parseFloat(currentBalance) || 0;
+    document.getElementById('settlement-user-id').value = userId;
+    document.getElementById('settlement-user-name').textContent = userName;
+    document.getElementById('settlement-curr-balance').textContent = modalCurrentBalance.toLocaleString('en-US') + ' د.ع';
+    
+    const amtInput = document.getElementById('settlement-amount');
+    amtInput.value = modalCurrentBalance > 0 ? modalCurrentBalance : '';
+    calculateBalancePreview();
+
+    Modal.open('settlement-modal');
+  }
+
+  function fillSettlementAmount(type) {
+    const amtInput = document.getElementById('settlement-amount');
+    if (!amtInput) return;
+    if (type === 'full') {
+      amtInput.value = modalCurrentBalance > 0 ? modalCurrentBalance : 0;
+    } else if (type === 'half') {
+      amtInput.value = modalCurrentBalance > 0 ? Math.round(modalCurrentBalance / 2) : 0;
+    }
+    calculateBalancePreview();
+  }
+
+  function calculateBalancePreview() {
+    const amt = parseFloat(document.getElementById('settlement-amount').value) || 0;
+    const preview = document.getElementById('settlement-new-balance-preview');
+    if (!preview) return;
+
+    const remaining = modalCurrentBalance - amt;
+    if (remaining <= 0) {
+      preview.textContent = 'المتبقي بعد التسوية: 0 د.ع (حساب مصفّى)';
+      preview.style.color = '#059669';
+    } else {
+      preview.textContent = 'المتبقي بعد التسوية: ' + remaining.toLocaleString('en-US') + ' د.ع';
+      preview.style.color = '#d97706';
+    }
+  }
+
+  async function submitSettlement(event) {
+    event.preventDefault();
+    const form = document.getElementById('settlement-form');
+    if (!form) return;
+
+    const btn = document.getElementById('settlement-submit-btn');
+    const restore = btn ? btnLoading(btn) : null;
+
+    const formData = new FormData(form);
+    const payload = {};
+    formData.forEach((v, k) => { payload[k] = v; });
+
+    const autoPrint = document.getElementById('settlement-auto-print') && document.getElementById('settlement-auto-print').checked;
+
+    try {
+      const res = await apiPost('/accounting/settlements/add', payload);
+      if (res.ok) {
+        Toast.success(res.message);
+        Modal.close('settlement-modal');
+        if (autoPrint && res.settlement_id) {
+          window.open(`/accounting/settlements/print/${res.settlement_id}`, '_blank');
+        }
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        Toast.error(res.message || 'فشل تسجيل السند');
+      }
+    } catch (err) {
+      Toast.error('خطأ في الاتصال بالخادم');
+    } finally {
+      restore && restore();
+    }
+  }
+
+  function confirmZeroBalance(userId, userName, balance) {
+    if (balance <= 0) {
+      Toast.info(`رصيد الموظف ${userName} مصفّر مسبقاً ولا توجد مبالغ في ذمته.`);
+      return;
+    }
+
+    showConfirm({
+      title: 'تأكيد تصفير الحساب بالكامل',
+      message: `هل أنت متأكد من تصفير حساب الموظف (${userName}) واستلام كامل المبلغ المتبقي (${balance.toLocaleString('en-US')} د.ع) وإنشاء سند تسوية تصفير؟`,
+      confirmText: 'تصفير الحساب الآن',
+      confirmClass: 'btn-danger',
+      onConfirm: async () => {
+        try {
+          const res = await apiPost(`/accounting/settlements/zero/${userId}`, {});
+          if (res.ok) {
+            Toast.success(res.message);
+            setTimeout(() => window.location.reload(), 1000);
+          } else {
+            Toast.error(res.message || 'فشل تصفير الحساب');
+          }
+        } catch (err) {
+          Toast.error('خطأ في الاتصال بالخادم');
+        }
+      }
+    });
+  }
+
+  // فلترة وبحث كروت الموظفين
+  function filterEmployeeCards() {
+    const query = (document.getElementById('emp-search-input').value || '').trim().toLowerCase();
+    const activeFilterBtn = document.querySelector('.emp-filter-btn.active');
+    const filter = activeFilterBtn ? activeFilterBtn.dataset.filter : 'all';
+
+    const cards = document.querySelectorAll('#employees-grid .emp-card');
+    cards.forEach(card => {
+      const name = card.dataset.name || '';
+      const username = card.dataset.username || '';
+      const hasBalance = card.dataset.hasBalance === 'true';
+
+      const matchQuery = !query || name.includes(query) || username.includes(query);
+      let matchFilter = true;
+      if (filter === 'balance') matchFilter = hasBalance;
+      if (filter === 'cleared') matchFilter = !hasBalance;
+
+      card.style.display = (matchQuery && matchFilter) ? 'flex' : 'none';
+    });
+  }
+
+  function setEmpFilter(filterType) {
+    document.querySelectorAll('.emp-filter-btn').forEach(btn => {
+      if (btn.dataset.filter === filterType) {
+        btn.classList.add('active');
+        btn.style.background = '#fff';
+        btn.style.color = '#0f172a';
+      } else {
+        btn.classList.remove('active');
+        btn.style.background = 'transparent';
+        btn.style.color = '#64748b';
+      }
+    });
+    filterEmployeeCards();
+  }
+</script>
 {% endblock %}

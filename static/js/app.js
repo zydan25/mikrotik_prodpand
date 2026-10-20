@@ -543,6 +543,7 @@ function makeSearchableSelect(selectEl) {
     const query = filterText.trim().toLowerCase();
 
     Array.from(selectEl.options).forEach((opt) => {
+      if (opt.style.display === 'none' || opt.hidden) return;
       const text = opt.text;
       const val = opt.value;
       if (!val && !text && opt.index !== 0) return;
@@ -654,6 +655,30 @@ async function openQuickRenewModal(subId = null, prefillUsername = null) {
     }
   }
 
+  // التأكد من تحميل الباقات إذا كانت القائمة فارغة
+  const profSelect = document.getElementById('qr-profile-id');
+  if (profSelect && profSelect.options.length <= 1) {
+    try {
+      const pRes = await fetch(`/api/profiles-by-category?device_id=${deviceId || ''}`);
+      const pData = await pRes.json();
+      if (pData.ok && pData.profiles && pData.profiles.length > 0) {
+        profSelect.innerHTML = '<option value="">-- اختر الباقة --</option>';
+        pData.profiles.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.text = p.name + (p.rate_limit ? ` (${p.rate_limit})` : '');
+          opt.dataset.category = p.category || 'عام';
+          opt.dataset.price = p.price || 0;
+          opt.dataset.badge = p.rate_limit || '';
+          profSelect.appendChild(opt);
+        });
+        profSelect.dispatchEvent(new Event('refreshCustomSelect'));
+      }
+    } catch(e) {
+      console.error('Error fetching profiles:', e);
+    }
+  }
+
   // إذا تم تمرير مشترك محدد للتجديد
   if (subId) {
     setQuickRenewMode('existing');
@@ -662,9 +687,32 @@ async function openQuickRenewModal(subId = null, prefillUsername = null) {
       userSelect.dispatchEvent(new Event('change'));
       userSelect.dispatchEvent(new Event('refreshCustomSelect'));
     }
+  } else {
+    updatePriceFromSelectedProfile();
   }
 
   Modal.open('quick-renew-modal');
+}
+
+function updatePriceFromSelectedProfile() {
+  const profSelect = document.getElementById('qr-profile-id');
+  const priceInput = document.getElementById('qr-price');
+  if (profSelect && priceInput) {
+    let opt = profSelect.options[profSelect.selectedIndex];
+    if ((!opt || !opt.value) && profSelect.options.length > 1) {
+      for (let i = 1; i < profSelect.options.length; i++) {
+        if (profSelect.options[i].style.display !== 'none' && !profSelect.options[i].hidden) {
+          profSelect.selectedIndex = i;
+          opt = profSelect.options[i];
+          break;
+        }
+      }
+    }
+    if (opt && opt.dataset && opt.dataset.price !== undefined) {
+      priceInput.value = opt.dataset.price;
+    }
+    profSelect.dispatchEvent(new Event('refreshCustomSelect'));
+  }
 }
 
 function setQuickRenewMode(mode) {
@@ -673,6 +721,9 @@ function setQuickRenewMode(mode) {
   const tabNew = document.getElementById('qr-tab-new');
   const existingSection = document.getElementById('qr-existing-section');
   const newSection = document.getElementById('qr-new-section');
+  const userSelect = document.getElementById('qr-existing-user-select');
+  const infoBadge = document.getElementById('qr-sub-info-badge');
+  const catSelect = document.getElementById('qr-category-select');
 
   if (modeInput) modeInput.value = mode;
 
@@ -686,6 +737,19 @@ function setQuickRenewMode(mode) {
     tabExisting && tabExisting.classList.remove('active');
     existingSection && (existingSection.style.display = 'none');
     newSection && (newSection.style.display = 'block');
+
+    if (userSelect) {
+      userSelect.value = '';
+      userSelect.dispatchEvent(new Event('refreshCustomSelect'));
+    }
+    if (infoBadge) infoBadge.style.display = 'none';
+
+    if (catSelect) {
+      catSelect.value = 'all';
+      catSelect.dispatchEvent(new Event('refreshCustomSelect'));
+    }
+    filterProfilesByCategory('all');
+    updatePriceFromSelectedProfile();
   }
 }
 
@@ -699,7 +763,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const selectedId = parseInt(userSelect.value);
       const sub = allSubscribersCache.find(s => s.id === selectedId);
       if (sub) {
-        // تعبئة البيانات التلقائية
         const nameInput = document.getElementById('qr-customer-name');
         const phoneInput = document.getElementById('qr-customer-phone');
         const priceInput = document.getElementById('qr-price');
@@ -719,7 +782,6 @@ document.addEventListener('DOMContentLoaded', () => {
           `;
         }
 
-        // تحديد فئة وباقة المشترك
         if (categorySelect && sub.category) {
           categorySelect.value = sub.category;
           categorySelect.dispatchEvent(new Event('refreshCustomSelect'));
@@ -727,6 +789,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (profileSelect && sub.profile_id) {
           profileSelect.value = sub.profile_id;
           profileSelect.dispatchEvent(new Event('refreshCustomSelect'));
+          updatePriceFromSelectedProfile();
         }
       }
     });
@@ -740,14 +803,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // تحديث السعر عند تغيير الباقة
+  // تحديث السعر تلقائياً عند تغيير الباقة (للمشترك الجديد والقديم)
   const profSelect = document.getElementById('qr-profile-id');
   if (profSelect) {
     profSelect.addEventListener('change', () => {
       const opt = profSelect.options[profSelect.selectedIndex];
-      if (opt && opt.dataset.price) {
-        const priceInput = document.getElementById('qr-price');
-        if (priceInput) priceInput.value = opt.dataset.price;
+      const priceInput = document.getElementById('qr-price');
+      if (opt && opt.dataset && opt.dataset.price !== undefined && priceInput) {
+        priceInput.value = opt.dataset.price;
       }
     });
   }
@@ -757,10 +820,13 @@ function filterProfilesByCategory(category, selectProfileId = null) {
   const profSelect = document.getElementById('qr-profile-id');
   if (!profSelect) return;
 
+  let firstMatch = null;
   Array.from(profSelect.options).forEach(opt => {
-    if (!opt.value) return; // ignore default
-    if (!category || category === 'all' || opt.dataset.category === category) {
+    if (!opt.value) return;
+    const matches = (!category || category === 'all' || opt.dataset.category === category);
+    if (matches) {
       opt.style.display = '';
+      if (!firstMatch) firstMatch = opt;
     } else {
       opt.style.display = 'none';
     }
@@ -768,7 +834,19 @@ function filterProfilesByCategory(category, selectProfileId = null) {
 
   if (selectProfileId) {
     profSelect.value = selectProfileId;
+  } else {
+    const currentOpt = profSelect.options[profSelect.selectedIndex];
+    if ((!currentOpt || currentOpt.style.display === 'none' || !currentOpt.value) && firstMatch) {
+      profSelect.value = firstMatch.value;
+    }
   }
+
+  const chosen = profSelect.options[profSelect.selectedIndex];
+  const priceInput = document.getElementById('qr-price');
+  if (chosen && chosen.dataset && chosen.dataset.price !== undefined && priceInput) {
+    priceInput.value = chosen.dataset.price;
+  }
+
   profSelect.dispatchEvent(new Event('refreshCustomSelect'));
 }
 
@@ -937,5 +1015,29 @@ async function syncSubscriptions(deviceId, btn) {
     Toast.error('خطأ في استيراد المشتركين');
   } finally {
     restore();
+  }
+}
+
+async function showRawPayload(subId, username) {
+  try {
+    const res = await fetch(`/api/sub-raw/${subId}`);
+    const data = await res.json();
+    if (data.ok) {
+      const uEl = document.getElementById('raw-modal-username');
+      const sEl = document.getElementById('raw-modal-synced');
+      const jEl = document.getElementById('raw-modal-json');
+      if (uEl) uEl.textContent = data.username;
+      if (sEl) sEl.textContent = data.synced_at;
+      if (jEl) {
+        if (data.raw_payload && Object.keys(data.raw_payload).length > 0) {
+          jEl.textContent = JSON.stringify(data.raw_payload, null, 2);
+        } else {
+          jEl.textContent = 'لم يتم حفظ بيانات خام بعد. قم بالنقر على زر المزامنة مع المايكروتك لجلب أحدث البيانات.';
+        }
+      }
+      Modal.open('raw-payload-modal');
+    }
+  } catch(e) {
+    Toast.error('فشل جلب بيانات المزامنة');
   }
 }

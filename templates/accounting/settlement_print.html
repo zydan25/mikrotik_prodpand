@@ -2,117 +2,280 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>سند قبض رقم {{ s.receipt_number }}</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap">
+  <title>سند قبض رسمي - {{ s.receipt_number }}</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap">
   <style>
+    * { box-sizing: border-box; }
     body {
       font-family: 'Cairo', sans-serif;
       margin: 0;
-      padding: 40px;
-      background: #f8fafc;
+      padding: 40px 20px;
+      background: #f1f5f9;
       color: #0f172a;
+      direction: rtl;
     }
-    .voucher-paper {
-      max-width: 680px;
+    .voucher-container {
+      max-width: 720px;
       margin: 0 auto;
       background: #fff;
-      padding: 30px;
-      border: 2px solid #cbd5e1;
+      padding: 36px 40px;
+      border: 2px solid #0f172a;
       border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+      position: relative;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.06);
     }
-    .header {
+    .watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-30deg);
+      font-size: 5rem;
+      font-weight: 900;
+      color: rgba(15, 23, 42, 0.03);
+      pointer-events: none;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .header-table {
+      width: 100%;
+      border-bottom: 3px double #0f172a;
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+    .header-logo {
+      font-size: 1.4rem;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+    }
+    .header-subtitle {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-top: 3px;
+    }
+    .receipt-title-badge {
+      display: inline-block;
+      border: 2px solid #0f172a;
+      padding: 6px 20px;
+      font-size: 1.25rem;
+      font-weight: 800;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .amount-highlight-box {
+      background: #f8fafc;
+      border: 2px dashed #059669;
+      border-radius: 10px;
+      padding: 16px;
+      margin: 20px 0;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 2px solid #0f172a;
-      padding-bottom: 16px;
-      margin-bottom: 20px;
     }
-    .row {
+    .amount-val {
+      font-size: 1.8rem;
+      font-weight: 900;
+      color: #059669;
+    }
+    .detail-row {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 12px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px dotted #cbd5e1;
       font-size: 0.95rem;
     }
-    .amount-box {
-      background: #f1f5f9;
-      border: 2px dashed #94a3b8;
-      border-radius: 8px;
-      padding: 14px;
-      text-align: center;
-      font-size: 1.5rem;
-      font-weight: 800;
-      color: #059669;
-      margin: 20px 0;
+    .detail-row:last-child {
+      border-bottom: none;
     }
-    .signatures {
+    .detail-label {
+      color: #64748b;
+      font-weight: 600;
+    }
+    .detail-value {
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .signatures-section {
       display: flex;
       justify-content: space-between;
-      margin-top: 50px;
+      align-items: flex-end;
+      margin-top: 45px;
       padding-top: 20px;
       border-top: 1px solid #e2e8f0;
     }
+    .sig-block {
+      text-align: center;
+      width: 30%;
+    }
+    .sig-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 45px;
+    }
+    .sig-line {
+      border-bottom: 1px dashed #64748b;
+      margin-top: 5px;
+    }
+    .stamp-circle {
+      width: 85px;
+      height: 85px;
+      border: 2px dashed #94a3b8;
+      border-radius: 50%;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      color: #94a3b8;
+      text-align: center;
+      transform: rotate(-10deg);
+    }
+    .no-print {
+      max-width: 720px;
+      margin: 20px auto 0 auto;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+    }
+    .btn-action {
+      padding: 10px 24px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s;
+    }
+    .btn-print {
+      background: #2563eb;
+      color: #fff;
+    }
+    .btn-close {
+      background: #e2e8f0;
+      color: #334155;
+    }
     @media print {
       body { background: #fff; padding: 0; }
-      .voucher-paper { border: 1.5px solid #000; box-shadow: none; }
-      .no-print { display: none; }
+      .voucher-container { border: 2px solid #000; box-shadow: none; max-width: 100%; border-radius: 0; }
+      .no-print { display: none !important; }
     }
   </style>
 </head>
 <body>
 
-<div class="voucher-paper">
-  <div class="header">
+<div class="voucher-container">
+  <div class="watermark">سند رسمي</div>
+
+  <table class="header-table">
+    <tr>
+      <td style="vertical-align:top;">
+        <div class="header-logo">🏢 إدارة شبكات البرودباند والإنترنت</div>
+        <div class="header-subtitle">قسم الحسابات والإدارة المالية العامة</div>
+      </td>
+      <td style="text-align:center; vertical-align:middle;">
+        <div class="receipt-title-badge">
+          {% if s.settlement_type == 'zeroing' %}
+            سند تصفير وتصفية شاملة
+          {% else %}
+            سند قبض وتوريد مالي
+          {% endif %}
+        </div>
+      </td>
+      <td style="text-align:left; vertical-align:top;">
+        <div style="font-weight:800; font-family:monospace; font-size:1rem; color:#0f172a;">
+          {{ s.receipt_number }}
+        </div>
+        <div style="font-size:0.82rem; color:#64748b; margin-top:4px;">
+          {{ s.settled_at.strftime('%Y-%m-%d %H:%M') }}
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Amount Highlight Box -->
+  <div class="amount-highlight-box">
     <div>
-      <h2 style="margin:0; font-size:1.4rem;">سند قبض وتسوية مالية</h2>
-      <div style="font-size:0.85rem; color:#64748b;">منظومة إدارة اشتراكات PPPoE</div>
+      <div style="font-size:0.85rem; color:#047857; font-weight:700;">المبلغ المستلم والمثبت بالسند:</div>
+      <div class="amount-val">
+        {{ "{:,.0f}".format(s.amount) }} <span style="font-size:1.1rem; font-weight:normal;">{{ s.currency }}</span>
+      </div>
     </div>
-    <div style="text-align:left;">
-      <div style="font-weight:700;">رقم السند: <span style="font-family:monospace;">{{ s.receipt_number }}</span></div>
-      <div style="font-size:0.85rem; color:#64748b;">التاريخ: {{ s.settled_at.strftime('%Y-%m-%d %H:%M') }}</div>
+    <div style="text-align:left; font-size:0.88rem; color:#047857; font-weight:700; background:#ecfdf5; padding:6px 14px; border-radius:20px;">
+      ✓ تم التوريد والتسوية
     </div>
   </div>
 
-  <div class="amount-box">
-    المبلغ المستلم: {{ "{:,.0f}".format(s.amount) }} {{ s.currency }}
-  </div>
-
-  <div class="row">
-    <span>استلمنا من الموظف / المحصل:</span>
-    <strong>{{ s.user.full_name }} (@{{ s.user.username }})</strong>
-  </div>
-
-  <div class="row">
-    <span>نوع السند:</span>
-    <strong>{% if s.settlement_type == 'zeroing' %}تصفير شامل للرصيد{% else %}سند قبض تسوية اشتراكات{% endif %}</strong>
-  </div>
-
-  <div class="row">
-    <span>المدير المستلم:</span>
-    <strong>{{ s.settled_by.full_name if s.settled_by else 'مدير النظام' }}</strong>
-  </div>
-
-  <div class="row">
-    <span>ملاحظات:</span>
-    <span>{{ s.notes or 'تسوية عهدة اشتراكات برودباند' }}</span>
-  </div>
-
-  <div class="signatures">
-    <div style="text-align:center;">
-      <div style="margin-bottom:40px;">توقيع الموظف المسلم:</div>
-      <div>___________________</div>
+  <!-- Details Rows -->
+  <div style="margin-top:16px;">
+    <div class="detail-row">
+      <span class="detail-label">استلمنا من السيد / المحصل:</span>
+      <span class="detail-value">{{ s.user.full_name }} (@{{ s.user.username }})</span>
     </div>
-    <div style="text-align:center;">
-      <div style="margin-bottom:40px;">توقيع واستلام المدير:</div>
-      <div>___________________</div>
+
+    <div class="detail-row">
+      <span class="detail-label">صفة الموظف:</span>
+      <span class="detail-value">
+        {% if s.user.is_admin %}مدير عام{% elif s.user.role == 'supervisor' %}مشرف شبكة{% else %}موظف تحصيل واشتراكات{% endif %}
+      </span>
+    </div>
+
+    <div class="detail-row">
+      <span class="detail-label">نوع السند وطريقة الدفع:</span>
+      <span class="detail-value">
+        {% if s.settlement_type == 'zeroing' %}
+          تصفير شامل لكامل العهدة المستحقة
+        {% elif s.settlement_type == 'transfer' %}
+          حوالة مصرفية / إلكترونية
+        {% else %}
+          سند قبض نقدي (تسليم يدوي لصندوق الإدارة)
+        {% endif %}
+      </span>
+    </div>
+
+    <div class="detail-row">
+      <span class="detail-label">المستلم والمدقق (الإدارة):</span>
+      <span class="detail-value">{{ s.settled_by.full_name if s.settled_by else 'مدير النظام' }}</span>
+    </div>
+
+    <div class="detail-row">
+      <span class="detail-label">البيان والملاحظات:</span>
+      <span class="detail-value" style="font-weight:600;">
+        {{ s.notes or 'تسوية عهدة ومبالغ تحصيل اشتراكات PPPoE' }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Signatures Section -->
+  <div class="signatures-section">
+    <div class="sig-block">
+      <div class="sig-title">الموظف المسلم</div>
+      <div style="font-size:0.85rem; font-weight:700; color:#0f172a;">{{ s.user.full_name }}</div>
+      <div class="sig-line"></div>
+    </div>
+
+    <div class="sig-block">
+      <div class="stamp-circle">
+        خاتم الإدارة<br>المالية
+      </div>
+    </div>
+
+    <div class="sig-block">
+      <div class="sig-title">أمين الصندوق / الإدارة</div>
+      <div style="font-size:0.85rem; font-weight:700; color:#0f172a;">{{ s.settled_by.full_name if s.settled_by else 'مدير النظام' }}</div>
+      <div class="sig-line"></div>
     </div>
   </div>
 </div>
 
-<div class="no-print" style="text-align:center; margin-top:20px;">
-  <button onclick="window.print()" style="padding:10px 24px; font-size:1rem; cursor:pointer; font-weight:700; background:#2563eb; color:#fff; border:none; border-radius:8px;">
+<div class="no-print">
+  <button class="btn-action btn-print" onclick="window.print()">
     🖨️ طباعة السند الآن
+  </button>
+  <button class="btn-action btn-close" onclick="window.close()">
+    إغلاق النافذة
   </button>
 </div>
 

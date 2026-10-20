@@ -82,29 +82,48 @@ def employees():
 
     users = User.query.filter_by(is_active=True).all()
     employees_data = []
+    tot_collected = 0
+    tot_settled = 0
+    tot_balance = 0
 
     for u in users:
         collected = u.total_collected()
         settled = u.total_settled()
         balance = u.current_balance
+        tot_collected += collected
+        tot_settled += settled
+        tot_balance += balance
         last_settlement = EmployeeSettlement.query.filter_by(user_id=u.id).order_by(EmployeeSettlement.settled_at.desc()).first()
         recent_payments_count = Payment.query.filter_by(collected_by_id=u.id).count()
+
+        pct = 100.0 if collected == 0 else min(100.0, max(0.0, round((settled / collected) * 100, 1)))
 
         employees_data.append({
             'user': u,
             'collected': collected,
             'settled': settled,
             'balance': balance,
+            'settled_percent': pct,
             'last_settlement': last_settlement,
             'payments_count': recent_payments_count
         })
 
     # آخر سندات تم تسجيلها في النظام
-    recent_settlements = EmployeeSettlement.query.order_by(EmployeeSettlement.settled_at.desc()).limit(15).all()
+    recent_settlements = EmployeeSettlement.query.order_by(EmployeeSettlement.settled_at.desc()).limit(25).all()
+
+    stats = {
+        'total_collected': tot_collected,
+        'total_settled': tot_settled,
+        'total_balance': tot_balance,
+        'total_employees': len(users),
+        'with_balance_count': sum(1 for d in employees_data if d['balance'] > 0),
+        'total_settlements_count': EmployeeSettlement.query.count()
+    }
 
     return render_template('accounting/employees.html',
         employees_data=employees_data,
-        recent_settlements=recent_settlements)
+        recent_settlements=recent_settlements,
+        stats=stats)
 
 # ======================================================
 # إضافة سند تسوية / قبض لموظف (AJAX)

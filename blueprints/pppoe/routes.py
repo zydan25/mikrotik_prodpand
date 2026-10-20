@@ -296,10 +296,12 @@ def quick_renew():
         if sub.disabled:
             need_update['disabled'] = 'no'
 
-        if need_update and sub.router_secret_id:
-            res = svc.update_secret(sub.router_secret_id, need_update)
+        if need_update:
+            res = svc.update_secret(sub.router_secret_id, need_update, username=sub.username)
             if not res.ok:
                 return jsonify({'ok': False, 'message': f'فشل التحديث في الراوتر: {res.message}'})
+            if res.data and isinstance(res.data, dict) and res.data.get('router_id'):
+                sub.router_secret_id = res.data['router_id']
 
         # تمديد التاريخ بالاعتماد على صلاحية الباقة الحقيقية
         val_days = profile.validity_days if profile.validity_days else 30
@@ -570,11 +572,12 @@ def edit_subscription(sub_id):
     comment = str(data.get('comment', sub.comment or ''))
     fields['comment'] = comment
 
-    if sub.router_secret_id:
-        svc = PPPoEService(sub.device)
-        result = svc.update_secret(sub.router_secret_id, fields)
-        if not result.ok:
-            return jsonify({'ok': False, 'message': result.message})
+    svc = PPPoEService(sub.device)
+    result = svc.update_secret(sub.router_secret_id, fields, username=sub.username)
+    if not result.ok:
+        return jsonify({'ok': False, 'message': result.message})
+    if result.data and isinstance(result.data, dict) and result.data.get('router_id'):
+        sub.router_secret_id = result.data['router_id']
 
     if new_password:
         sub.password = new_password
@@ -619,11 +622,10 @@ def delete_subscription(sub_id):
     sub = PPPoESubscription.query.get_or_404(sub_id)
     username = sub.username
 
-    if sub.router_secret_id:
-        svc = PPPoEService(sub.device)
-        result = svc.delete_secret(sub.router_secret_id, sub.username)
-        if not result.ok:
-            return jsonify({'ok': False, 'message': result.message})
+    svc = PPPoEService(sub.device)
+    result = svc.delete_secret(sub.router_secret_id, username=sub.username)
+    if not result.ok:
+        return jsonify({'ok': False, 'message': result.message})
 
     db.session.delete(sub)
     db.session.commit()
@@ -642,11 +644,10 @@ def toggle_disable(sub_id):
     sub = PPPoESubscription.query.get_or_404(sub_id)
     new_disabled = not sub.disabled
 
-    if sub.router_secret_id:
-        svc = PPPoEService(sub.device)
-        result = svc.set_disabled(sub.router_secret_id, new_disabled, sub.username)
-        if not result.ok:
-            return jsonify({'ok': False, 'message': result.message})
+    svc = PPPoEService(sub.device)
+    result = svc.set_disabled(sub.router_secret_id, new_disabled, username=sub.username)
+    if not result.ok:
+        return jsonify({'ok': False, 'message': result.message})
 
     sub.disabled = new_disabled
     sub.updated_at = datetime.utcnow()
@@ -846,7 +847,7 @@ def api_sync_subscriptions(device_id):
         if not username:
             continue
 
-        rid = str(row.get('.id', ''))
+        rid = str(row.get('id') or row.get('.id', ''))
         prof_name = str(row.get('profile', 'default'))
         profile_id = prof_map.get(prof_name)
         password = str(row.get('password', '')) or '1234'
@@ -855,16 +856,19 @@ def api_sync_subscriptions(device_id):
         disabled = str(row.get('disabled', 'false')).lower() in ('true', 'yes')
         raw_comment = row.get('comment', '')
         comment = decode_mikrotik_text(raw_comment) if raw_comment else ''
+        last_logged = str(row.get('last-logged-out', ''))
 
         sub = PPPoESubscription.query.filter_by(device_id=device_id, username=username).first()
         if sub:
-            sub.router_secret_id = rid
+            if rid: sub.router_secret_id = rid
             if profile_id:
                 sub.profile_id = profile_id
             sub.disabled = disabled
             if caller_id: sub.caller_id = caller_id
             if static_ip: sub.static_ip = static_ip
             if comment and not sub.comment: sub.comment = comment
+            if last_logged: sub.last_logged_out = last_logged
+            sub.raw_payload = row
             sub.remote_exists = True
             sub.synced_at = now
             updated += 1
@@ -886,14 +890,36 @@ def api_sync_subscriptions(device_id):
                 started_at=now,
                 expires_at=now + timedelta(days=PPPoEProfile.query.get(profile_id).validity_days if profile_id and PPPoEProfile.query.get(profile_id) and PPPoEProfile.query.get(profile_id).validity_days else 30),
                 synced_at=now,
+                last_logged_out=last_logged,
+                raw_payload=row,
                 remote_exists=True
             )
             db.session.add(sub)
             created += 1
 
+    device.last_sync_raw = {
+        'total_secrets': len(result.data),
+        'synced_at': now.isoformat(),
+        'sample': result.data[0] if result.data else {}
+    }
     db.session.commit()
     log_audit('sync_subs', f'مزامنة مشتركي الراوتر: استيراد {created} وتحديث {updated}', 'device', device.id)
     return jsonify({
         'ok': True,
         'message': f'تمت المزامنة بنجاح: تم استيراد {created} مشترك جديد وتحديث {updated} مشترك'
+    })
+
+@pppoe_bp.route('/api/sub-raw/<int:sub_id>')
+@login_required
+def api_sub_raw(sub_id):
+    sub = PPPoESubscription.query.get_or_404(sub_id)
+    return jsonify({
+        'ok': True,
+        'username': sub.username,
+        'router_secret_id': sub.router_secret_id,
+        'synced_at': sub.synced_at.strftime('%Y-%m-%d %H:%M:%S') if sub.synced_at else 'لم تتم المزامنة بعد',
+        'raw_payload': sub.raw_payload or {},
+        'started_at': sub.started_at.strftime('%Y-%m-%d %H:%M') if sub.started_at else '—',
+        'expires_at': sub.expires_at.strftime('%Y-%m-%d %H:%M') if sub.expires_at else '—',
+        'last_logged_out': sub.last_logged_out or '—'
     })

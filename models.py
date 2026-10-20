@@ -97,6 +97,7 @@ class MikroTikDevice(db.Model):
     last_seen = db.Column(db.DateTime, nullable=True)
     last_status = db.Column(db.String(20), default='unknown')
     ros_version = db.Column(db.String(50), default='')
+    last_sync_raw = db.Column(db.JSON, default=dict)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     profiles = db.relationship('PPPoEProfile', backref='device', lazy='dynamic', cascade='all, delete-orphan')
@@ -189,6 +190,7 @@ class PPPoESubscription(db.Model):
     # تتبع المزامنة
     synced_at = db.Column(db.DateTime, nullable=True)
     remote_exists = db.Column(db.Boolean, default=True)
+    raw_payload = db.Column(db.JSON, default=dict)
 
     payments = db.relationship('Payment', backref='subscription', lazy='dynamic', cascade='all, delete-orphan')
 

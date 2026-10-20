@@ -385,22 +385,61 @@ class PPPoEService:
             return MikroTikResult(False, f'فشل إنشاء الحساب: {str(e)}')
 
     # ------------------------------------------
-    # تعديل اشتراك
+    # البحث عن معرف الحساب بالاسم
     # ------------------------------------------
-    def update_secret(self, router_id: str, fields: dict) -> MikroTikResult:
+    def find_secret_id_by_name(self, username: str) -> str:
         try:
             if self._use_rest:
                 client = self._rest()
-                client.patch(f'/ppp/secret/{router_id}', fields)
-                return MikroTikResult(True, 'تم تعديل الحساب بنجاح')
+                data = client.get('/ppp/secret', params={'name': username})
+                if isinstance(data, list) and data:
+                    return str(data[0].get('id') or data[0].get('.id') or '')
+                return ''
             else:
                 client = self._binary()
                 res, api = client.get_resource(['/ppp/secret', 'ppp/secret'])
-                fields['numbers'] = router_id
-                res.call('set', fields)
+                items = list(res.get(name=username))
                 client.disconnect()
-                return MikroTikResult(True, 'تم تعديل الحساب بنجاح')
+                if items:
+                    return str(items[0].get('id') or items[0].get('.id') or '')
+                return ''
+        except Exception:
+            return ''
+
+    # ------------------------------------------
+    # تعديل اشتراك
+    # ------------------------------------------
+    def update_secret(self, router_id: str, fields: dict, username: str = '') -> MikroTikResult:
+        try:
+            if not router_id and username:
+                router_id = self.find_secret_id_by_name(username)
+            if not router_id:
+                return MikroTikResult(False, 'لم يتم العثور على معرف الحساب في الراوتر')
+
+            if self._use_rest:
+                client = self._rest()
+                client.patch(f'/ppp/secret/{router_id}', fields)
+                if username and 'profile' in fields:
+                    self._kick_user_rest(client, username)
+                return MikroTikResult(True, 'تم تعديل الحساب بنجاح', {'router_id': router_id})
+            else:
+                client = self._binary()
+                res, api = client.get_resource(['/ppp/secret', 'ppp/secret'])
+                call_fields = dict(fields)
+                call_fields['numbers'] = router_id
+                res.call('set', call_fields)
+                if username and 'profile' in fields:
+                    self._kick_user_binary(api, username)
+                client.disconnect()
+                return MikroTikResult(True, 'تم تعديل الحساب بنجاح', {'router_id': router_id})
         except Exception as e:
+            if username and router_id:
+                try:
+                    new_id = self.find_secret_id_by_name(username)
+                    if new_id and new_id != router_id:
+                        return self.update_secret(new_id, fields, username='')
+                except Exception:
+                    pass
             return MikroTikResult(False, f'فشل تعديل الحساب: {str(e)}')
 
     # ------------------------------------------
@@ -408,6 +447,10 @@ class PPPoEService:
     # ------------------------------------------
     def delete_secret(self, router_id: str, username: str = '') -> MikroTikResult:
         try:
+            if not router_id and username:
+                router_id = self.find_secret_id_by_name(username)
+            if not router_id:
+                return MikroTikResult(False, 'لم يتم العثور على معرف الحساب في الراوتر')
             if self._use_rest:
                 client = self._rest()
                 client.delete(f'/ppp/secret/{router_id}')
@@ -431,6 +474,10 @@ class PPPoEService:
     def set_disabled(self, router_id: str, disabled: bool, username: str = '') -> MikroTikResult:
         val = 'true' if disabled else 'false'
         try:
+            if not router_id and username:
+                router_id = self.find_secret_id_by_name(username)
+            if not router_id:
+                return MikroTikResult(False, 'لم يتم العثور على معرف الحساب في الراوتر')
             if self._use_rest:
                 client = self._rest()
                 client.patch(f'/ppp/secret/{router_id}', {'disabled': val})
